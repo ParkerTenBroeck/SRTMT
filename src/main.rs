@@ -1,0 +1,42 @@
+use std::io::Read;
+
+use system::System;
+
+pub mod system;
+pub mod thread;
+
+fn main() {
+    let mut args = std::env::args().skip(1).peekable(); // skip executable name
+
+    let mut system = System::default();
+
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "-B" => {
+                if let Some(next) = args.peek() {
+                    if next.starts_with('-') {
+                        panic!("Expected list of packages to build not: {}", next);
+                    }
+                    for arg in next.split(',') {
+                        let arg = arg.trim();
+
+                        let pages = system.add_thread([0x0, 0x8000]);
+                        let mut file = std::fs::File::open(arg).unwrap();
+                        // let mut buf = Vec::new();
+                        let ammount = file.read(pages[0]).unwrap();
+                        if ammount == 0x10000 {
+                            panic!();
+                        }
+                    }
+                }
+                args.next();
+            }
+            _ => {
+                panic!("Invalid arguments given: {}", arg);
+            }
+        }
+    }
+
+    system.run();
+    println!("All threads exited shutting down");
+}

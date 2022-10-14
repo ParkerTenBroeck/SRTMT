@@ -1,0 +1,18 @@
+[workspace]
+members = [
+    "build_tools",
+    "vm_lib",
+    "vm_test",
+    "vm_shell",
+]
+resolver = "2"
+
+
+
+[package]
+name = "srtmt"
+version = "0.1.0"
+edition = "2021"
+description = "A sorta simulation of real time multithreading without actual multithreading"
+
+[dependencies]

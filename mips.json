@@ -1,0 +1,30 @@
+{
+  "arch": "mips",
+  "cpu": "mips3",
+  "crt-static-respected": true,
+  "data-layout": "e-m:m-p:32:32-i8:8:32-i16:16:32-i64:64-n32-S64",
+  "executables": true,
+  "features": "+mips1,+mips2,-mips3,-mips32,-mips32r2,-ptr64,-gp64,+xgot,+soft-float",
+  "llvm-target": "mipsel-unknown-none",
+  "max-atomic-width": 32,
+  "linker": "mipsel-linux-gnu-ld",
+  "linker-flavor": "ld",
+  "disable-redzone": true,
+  "position-independent-executables": true,
+  "panic-strategy": "abort",
+  "relro-level": "full",
+  "target-endian": "little",
+  "target-mcount": "_mcount",
+  "os": "none",
+  "target-pointer-width": "32",
+  "relocation-model": "static",
+  "pre-link-args": {
+    "ld": [
+        "--script=mips/link.map"
+    ]
+  },
+  "llvm-args": [
+    "--disable-mips-delay-filler"
+  ],
+  "forces-embed-bitcode": true
+}

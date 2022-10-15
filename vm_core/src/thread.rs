@@ -352,7 +352,7 @@ impl Thread {
                 if unlikely(self.vm_state.pc >> 16 != ins_cache.1) {
                     ins_cache = (
                         {
-                            match & mem.mem[self.vm_state.pc as usize >> 16] {
+                            match &mem.mem[self.vm_state.pc as usize >> 16] {
                                 Some(page) => *page as *const [u8; 0x10000],
                                 None => {
                                     return Err(ThreadError::MemoryDoesNotExistError(
@@ -915,7 +915,7 @@ impl Thread {
                     let address = ((self.vm_state.reg[immediate_s!(op)] as i32)
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
-                    
+
                     if likely(address & 0b11 == 0) {
                         self.vm_state.reg[immediate_t!(op)] = get_mem_alligned!(address, u32);
                     //self.mem.get_u32_alligned(address) as u32
@@ -943,7 +943,7 @@ impl Thread {
                     let address = ((self.vm_state.reg[immediate_s!(op)] as i32)
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
-                    
+
                     if likely(address & 0b11 == 0) {
                         if *mem.ll_bit {
                             // if address < 0x10000{

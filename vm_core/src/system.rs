@@ -19,12 +19,10 @@ impl System {
                 //println!("Starting thread: {} for {} iterations", self.threads.thread_pool[thread_index].id(), iterations);
                 let res = self.run_thread(thread_index, &mut mem, iterations);
                 //println!("{:#?}", self.threads.thread_pool[id]);
-                
-                
+
                 if let Some(new_thread_info) = self.core.create_new_thread.take() {
-    
                     let mut new_thread = Thread::new(new_thread_info.new_id);
-    
+
                     let shared_core_and_data = self
                         .threads
                         .get_thread(new_thread_info.creator_id)
@@ -44,7 +42,7 @@ impl System {
                         .mapping
                         .push((self.threads.sys_mem.v_mem.len(), 0x7FFF));
                     self.threads.sys_mem.v_mem.push([0; 0x10000]); //personal stack memory for thread
-    
+
                     new_thread.vm_state.pc = new_thread_info.start_addr; //start of function
                     new_thread.vm_state.reg[4] = new_thread_info.argument_ptr; //ptr to arguments in memory
                     new_thread.vm_state.reg[29] = 0x80000000; //start of stack
@@ -56,12 +54,7 @@ impl System {
                     );
                     self.threads.thread_pool.push(new_thread);
                 }
-                
-                
-                
-                
-                
-                
+
                 match res {
                     Ok(ok) => match ok {
                         ThreadRunResult::Continue => {}

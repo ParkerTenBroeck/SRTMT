@@ -10,10 +10,11 @@ fn main() {
     let handle = vm_lib::thread::start_new_thread(move || {
         for i in 0..number {
             println!("NEW THREAD: {}", i);
-            let _ = vm_lib::thread::start_new_thread(move ||{
+            let _ = vm_lib::thread::start_new_thread(move || {
                 println!("{} ON A NEW THREAD", i);
                 // panic!();
-            }).unwrap();
+            })
+            .unwrap();
         }
     })
     .unwrap();
@@ -31,7 +32,6 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
         vm_lib::sys::halt();
     }
 }
-
 
 #[global_allocator]
 static ALLOCATOR: emballoc::Allocator<4096> = emballoc::Allocator::new();

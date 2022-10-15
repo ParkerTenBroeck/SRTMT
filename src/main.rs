@@ -2,9 +2,7 @@ use std::io::Read;
 
 use vm_core::system::System;
 
-
 fn main() {
-
     tracing_subscriber::fmt::init();
 
     let mut args = std::env::args().skip(1).peekable(); // skip executable name

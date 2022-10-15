@@ -15,7 +15,7 @@ impl System {
         while !self.threads.thread_pool.is_empty() {
             let len = self.threads.thread_pool.len();
             for thread_index in 0..len {
-                let iterations = 1;
+                let iterations = 600;
                 //println!("Starting thread: {} for {} iterations", self.threads.thread_pool[thread_index].id(), iterations);
                 let res = self.run_thread(thread_index, &mut mem, iterations);
                 //println!("{:#?}", self.threads.thread_pool[id]);

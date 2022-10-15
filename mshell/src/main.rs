@@ -2,15 +2,15 @@
 #![no_main]
 #![feature(default_alloc_error_handler)]
 
-use vm_lib::*;
+use mlib::*;
 
 #[no_mangle]
 fn main() {
     let number = 23;
-    let handle = vm_lib::thread::start_new_thread(move || {
+    let handle = mlib::thread::start_new_thread(move || {
         for i in 0..number {
             println!("NEW THREAD: {}", i);
-            let _ = vm_lib::thread::start_new_thread(move || {
+            let _ = mlib::thread::start_new_thread(move || {
                 println!("{} ON A NEW THREAD", i);
                 // panic!();
             })
@@ -29,7 +29,7 @@ fn main() {
 fn panic(info: &core::panic::PanicInfo) -> ! {
     println!("PANIC: {:#?}", info);
     loop {
-        vm_lib::sys::halt();
+        mlib::sys::halt();
     }
 }
 

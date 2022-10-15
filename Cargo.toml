@@ -1,9 +1,9 @@
 [workspace]
 members = [
     "build_tools",
-    "vm_lib",
-    "vm_test",
-    "vm_shell",
+    "mlib",
+    "mtest",
+    "mshell",
     "vm_core",
 ]
 resolver = "2"

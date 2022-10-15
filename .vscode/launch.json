@@ -16,7 +16,7 @@
             },
             "args": [
                 "-B",
-                "${workspaceFolder}/target/mips/release/vm_shell.bin,${workspaceFolder}/target/mips/release/vm_test.bin"
+                "${workspaceFolder}/target/mips/release/mshell.bin,${workspaceFolder}/target/mips/release/mtest.bin"
             ],
             "cwd": "${workspaceFolder}"
         },

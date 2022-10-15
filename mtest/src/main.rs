@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use vm_lib::*;
+use mlib::*;
 
 #[no_mangle]
 fn main() {
@@ -14,6 +14,6 @@ fn main() {
 fn panic(info: &core::panic::PanicInfo) -> ! {
     println!("PANIC: {:#?}", info);
     loop {
-        vm_lib::sys::halt();
+        mlib::sys::halt();
     }
 }

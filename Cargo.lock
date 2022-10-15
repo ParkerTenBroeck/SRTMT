@@ -62,6 +62,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "mlib"
+version = "0.1.0"
+
+[[package]]
+name = "mshell"
+version = "0.1.0"
+dependencies = [
+ "emballoc",
+ "mlib",
+ "spin",
+]
+
+[[package]]
+name = "mtest"
+version = "0.1.0"
+dependencies = [
+ "mlib",
+]
+
+[[package]]
 name = "nu-ansi-term"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -241,26 +261,6 @@ name = "vm_core"
 version = "0.1.0"
 dependencies = [
  "tracing",
-]
-
-[[package]]
-name = "vm_lib"
-version = "0.1.0"
-
-[[package]]
-name = "vm_shell"
-version = "0.1.0"
-dependencies = [
- "emballoc",
- "spin",
- "vm_lib",
-]
-
-[[package]]
-name = "vm_test"
-version = "0.1.0"
-dependencies = [
- "vm_lib",
 ]
 
 [[package]]

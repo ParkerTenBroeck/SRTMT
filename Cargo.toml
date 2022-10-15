@@ -4,6 +4,7 @@ members = [
     "vm_lib",
     "vm_test",
     "vm_shell",
+    "vm_core",
 ]
 resolver = "2"
 
@@ -16,3 +17,6 @@ edition = "2021"
 description = "A sorta simulation of real time multithreading without actual multithreading"
 
 [dependencies]
+tracing = "0.1"
+tracing-subscriber = "0.3"
+vm_core = { path = "vm_core" }

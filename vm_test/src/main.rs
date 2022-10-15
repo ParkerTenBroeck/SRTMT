@@ -5,12 +5,15 @@ use vm_lib::*;
 
 #[no_mangle]
 fn main() {
-    loop {
+    for _ in 0..10 {
         println!("Hello World!");
     }
 }
 
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    println!("PANIC: {:#?}", info);
+    loop {
+        vm_lib::sys::halt();
+    }
 }

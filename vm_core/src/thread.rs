@@ -1,11 +1,44 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use crate::system::{Page, PageId, SystemCore};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ThreadId(u32);
+
+impl Display for ThreadId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl ThreadId {
+    pub fn from_raw(id: u32) -> Self {
+        Self(id)
+    }
+
+    pub fn into_raw(&self) -> u32 {
+        self.0
+    }
+}
+
+#[derive(Debug)]
 pub struct Thread {
+    id: ThreadId,
     pub vm_state: ThreadVmState,
     pub memory_mapping: ThreadMemoryMapping,
+}
+
+impl Thread {
+    pub fn new(id: ThreadId) -> Self {
+        Self {
+            id,
+            vm_state: Default::default(),
+            memory_mapping: Default::default(),
+        }
+    }
+
+    pub fn id(&self) -> ThreadId {
+        self.id
+    }
 }
 
 pub type PageVAddressStart = u16;
@@ -191,7 +224,7 @@ fn unlikely(b: bool) -> bool {
 pub enum ThreadRunResult {
     Continue,
     Wait(u32),
-    Exit(u32),
+    Exit(u32, u32),
 }
 
 pub type VmPtr = u32;
@@ -233,7 +266,7 @@ impl Thread {
             (
                 {
                     match &mut mem.mem[0] {
-                        Some(page) => *page as *mut [u8; 0x10000],
+                        Some(page) => *page as *const [u8; 0x10000],
                         None => {
                             return Err(ThreadError::MemoryDoesNotExistError(
                                 self.vm_state.pc,
@@ -263,7 +296,7 @@ impl Thread {
                     //     );
                     // }
 
-                    let page = match &mut mem.mem[0]{
+                    let page = match &mut mem.mem[address as usize >> 16]{
                         Some(page) => {
                             page
                         },
@@ -288,12 +321,12 @@ impl Thread {
                     //     );
                     // }
 
-                    let page = match &mut mem.mem[0]{
+                    let page = match &mut mem.mem[address as usize >> 16]{
                         Some(page) => {
                             page
                         },
                         None => {
-                            return Err(ThreadError::MemoryDoesNotExistError(self.vm_state.pc, self.vm_state.pc))
+                            return Err(ThreadError::MemoryDoesNotExistError(address, self.vm_state.pc))
                         },
                     };
                     let item = page.get_unchecked_mut(address as u16 as usize);
@@ -319,8 +352,8 @@ impl Thread {
                 if unlikely(self.vm_state.pc >> 16 != ins_cache.1) {
                     ins_cache = (
                         {
-                            match &mut mem.mem[self.vm_state.pc as usize >> 16] {
-                                Some(page) => *page as *mut [u8; 0x10000],
+                            match & mem.mem[self.vm_state.pc as usize >> 16] {
+                                Some(page) => *page as *const [u8; 0x10000],
                                 None => {
                                     return Err(ThreadError::MemoryDoesNotExistError(
                                         self.vm_state.pc,
@@ -349,6 +382,9 @@ impl Thread {
                                 return Err(ThreadError::InvalidOperation(self.vm_state.pc, op))
                             }
                         },
+                        crate::system::InterfaceCallResult::Exit => {
+                            return Ok(ThreadRunResult::Exit(ran, 0))
+                        }
                         crate::system::InterfaceCallResult::InvalidCall(id) => {
                             return Err(ThreadError::InvalidOperation(self.vm_state.pc, id))
                         },
@@ -879,7 +915,7 @@ impl Thread {
                     let address = ((self.vm_state.reg[immediate_s!(op)] as i32)
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
-
+                    
                     if likely(address & 0b11 == 0) {
                         self.vm_state.reg[immediate_t!(op)] = get_mem_alligned!(address, u32);
                     //self.mem.get_u32_alligned(address) as u32
@@ -907,8 +943,12 @@ impl Thread {
                     let address = ((self.vm_state.reg[immediate_s!(op)] as i32)
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
+                    
                     if likely(address & 0b11 == 0) {
                         if *mem.ll_bit {
+                            // if address < 0x10000{
+                            //     println!("thread: {}: av{:010X} -> m{:010X}", self.id(),self.vm_state.reg[immediate_t!(op)], address )
+                            // }
                             set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)], u32);
                             self.vm_state.reg[immediate_t!(op)] = 1;
                         } else {
@@ -927,7 +967,9 @@ impl Thread {
                     let address = ((self.vm_state.reg[immediate_s!(op)] as i32)
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
-
+                    // if address < 0x10000{
+                    //     println!("thread: {}: v{:04X} -> m{:010X}", self.id(),self.vm_state.reg[immediate_t!(op)] as u8, address )
+                    // }
                     *mem.ll_bit = false;
                     set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)] as u8, u8);
                 }
@@ -936,7 +978,9 @@ impl Thread {
                     let address = ((self.vm_state.reg[immediate_s!(op)] as i32)
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
-
+                    // if address < 0x10000{
+                    //     println!("thread: {}: v{:06X} -> m{:010X}", self.id(),self.vm_state.reg[immediate_t!(op)] as u16, address )
+                    // }
                     if likely(address & 0b1 == 0) {
                         *mem.ll_bit = false;
                         set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)] as u16, u16);
@@ -950,6 +994,9 @@ impl Thread {
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
                     if likely(address & 0b11 == 0) {
+                        // if address < 0x10000{
+                        //     println!("thread: {}: v{:010X} -> m{:010X}", self.id(),self.vm_state.reg[immediate_t!(op)], address )
+                        // }
                         *mem.ll_bit = false;
                         set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)], u32);
                     } else {

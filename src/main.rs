@@ -1,11 +1,12 @@
 use std::io::Read;
 
-use system::System;
+use vm_core::system::System;
 
-pub mod system;
-pub mod thread;
 
 fn main() {
+
+    tracing_subscriber::fmt::init();
+
     let mut args = std::env::args().skip(1).peekable(); // skip executable name
 
     let mut system = System::default();
@@ -20,7 +21,7 @@ fn main() {
                     for arg in next.split(',') {
                         let arg = arg.trim();
 
-                        let pages = system.add_thread([0x0, 0x8000]);
+                        let pages = system.add_thread([0x0, 0x7FFF]);
                         let mut file = std::fs::File::open(arg).unwrap();
                         // let mut buf = Vec::new();
                         let ammount = file.read(pages[0]).unwrap();

@@ -73,7 +73,7 @@ pub fn build_vm_binary(name: &str) {
         .arg(name)
         .arg("--target")
         .arg("mips.json")
-        .arg("-Zbuild-std=core,compiler_builtins")
+        .arg("-Zbuild-std=core,compiler_builtins,alloc")
         .arg("-Zbuild-std-features=compiler-builtins-mem");
 
     let _ = run_cmd.status().unwrap();

@@ -1,17 +1,9 @@
 [package]
-name = "vm_shell"
+name = "vm_core"
 version = "0.1.0"
 edition = "2021"
-
-
-
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-vm_lib = { path = "../vm_lib", features = ["alloc"]}
-spin = "*"
-
-
-[dependencies.emballoc]
-version = "*"
+tracing = "0.1"

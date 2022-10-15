@@ -9,9 +9,12 @@
 #![feature(linkage)]
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
+#![feature(box_syntax)]
 
 pub mod core_rust;
 pub mod sys;
+#[cfg(feature = "alloc")]
+pub mod thread;
 
 #[no_mangle]
 #[naked]

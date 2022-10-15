@@ -58,6 +58,15 @@ pub fn halt() -> ! {
 }
 
 #[inline(always)]
+pub fn halt_fs() -> ! {
+    loop {
+        unsafe {
+            syscall_0_0::<HALT>();
+        }
+    }
+}
+
+#[inline(always)]
 pub fn print_i32(num: i32) {
     unsafe {
         syscall_1_0::<PRINT_DEC_NUMBER>(num as u32);

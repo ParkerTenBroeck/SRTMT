@@ -1,17 +1,24 @@
 use core::{fmt::Display, num::NonZeroU32};
 
-use alloc::boxed::Box;
+use crate::arch::START_NEW_THREAD;
 
-use crate::sys::START_NEW_THREAD;
 
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
+
+
+#[cfg(feature = "alloc")]
 pub fn start_new_thread<F, T>(f: F) -> Result<ThreadJoinHandle, ()>
 where
     F: FnOnce() -> T,
     F: Send + 'static,
     T: Send + 'static,
 {
+    use crate::arch::halt_fs;
+
     let main = move || {
         f();
     };
@@ -19,7 +26,7 @@ where
     let p = Box::into_raw(box main);
 
     let p = p as *mut core::ffi::c_void;
-    let res = unsafe { create_thread_(run_thread, p) };
+    let res = unsafe { create_thread(run_thread, p) };
     if res.is_err() {
         unsafe {
             //drop if thread isnt created
@@ -32,11 +39,11 @@ where
         unsafe {
             Box::from_raw(main as *mut Box<dyn FnOnce() + Send>)();
         }
-        crate::sys::halt_fs();
+        halt_fs();
     }
 }
 
-unsafe fn create_thread_(
+pub unsafe fn create_thread(
     main: extern "C" fn(*mut core::ffi::c_void),
     args: *mut core::ffi::c_void,
 ) -> Result<ThreadJoinHandle, ()> {
@@ -45,7 +52,7 @@ unsafe fn create_thread_(
         main as u32,
         args as u32
     );
-    let res = crate::sys::syscall_ss_s::<START_NEW_THREAD>(main as u32, args as u32);
+    let res = crate::arch::syscall_ss_s::<START_NEW_THREAD>(main as u32, args as u32);
     if let Some(id) = NonZeroU32::new(res) {
         Ok(ThreadJoinHandle { id })
     } else {

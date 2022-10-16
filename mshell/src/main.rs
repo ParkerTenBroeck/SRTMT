@@ -29,7 +29,7 @@ fn main() {
 fn panic(info: &core::panic::PanicInfo) -> ! {
     println!("PANIC: {:#?}", info);
     loop {
-        mlib::sys::halt();
+        mlib::process::exit(-1);
     }
 }
 

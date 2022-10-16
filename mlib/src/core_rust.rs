@@ -51,35 +51,3 @@ pub unsafe extern "C" fn memmove(mut dest: *mut u8, mut src: *mut u8, count: usi
         }
     }
 }
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => {
-        let mut wrapper = $crate::core_rust::DirectWritter::new();
-        let _ = core::fmt::Write::write_fmt(&mut wrapper, core::format_args!($($arg)*));
-    };
-}
-#[macro_export]
-#[allow_internal_unstable(format_args_nl)]
-macro_rules! println {
-    ($($arg:tt)*) => {
-        let mut wrapper = $crate::core_rust::DirectWritter::new();
-        let _ = core::fmt::Write::write_fmt(&mut wrapper, core::format_args_nl!($($arg)*));
-    };
-}
-
-#[derive(Default)]
-pub struct DirectWritter {}
-
-impl DirectWritter {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl core::fmt::Write for DirectWritter {
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        crate::sys::print_str_bytes(s.as_bytes());
-        Ok(())
-    }
-}

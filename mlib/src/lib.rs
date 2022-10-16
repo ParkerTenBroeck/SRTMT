@@ -11,12 +11,12 @@
 #![feature(generic_const_exprs)]
 #![feature(box_syntax)]
 
-pub mod core_rust;
-pub mod thread;
-pub mod sync;
 pub mod arch;
+pub mod core_rust;
 pub mod io;
 pub mod process;
+pub mod sync;
+pub mod thread;
 
 mod marcos;
 pub use marcos::*;

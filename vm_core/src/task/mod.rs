@@ -1,54 +1,41 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
-use crate::system::{Page, PageId, SystemCore};
-
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ThreadId(u32);
-
-impl Display for ThreadId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-impl ThreadId {
-    pub fn from_raw(id: u32) -> Self {
-        Self(id)
-    }
-
-    pub fn into_raw(&self) -> u32 {
-        self.0
-    }
-}
+use crate::{
+    system::SystemCore,
+    util::{Page, PageId, ProcessId},
+};
 
 #[derive(Debug)]
-pub struct Thread {
-    id: ThreadId,
-    pub vm_state: ThreadVmState,
-    pub memory_mapping: ThreadMemoryMapping,
+pub struct Task {
+    pid: ProcessId,
+    pub name: Option<String>,
+    pub vm_state: VmState,
+    pub memory_mapping: TaskMemoryMapping,
 }
 
-impl Thread {
-    pub fn new(id: ThreadId) -> Self {
+impl Task {
+    pub fn new(id: ProcessId) -> Self {
         Self {
-            id,
+            pid: id,
             vm_state: Default::default(),
             memory_mapping: Default::default(),
+            name: None,
         }
     }
 
-    pub fn id(&self) -> ThreadId {
-        self.id
+    pub fn pid(&self) -> ProcessId {
+        self.pid
     }
 }
 
 pub type PageVAddressStart = u16;
 
 #[derive(Default)]
-pub struct ThreadMemoryMapping {
+pub struct TaskMemoryMapping {
     pub mapping: Vec<(PageId, PageVAddressStart)>,
 }
 
-impl Debug for ThreadMemoryMapping {
+impl Debug for TaskMemoryMapping {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         struct Mapped {
             p_id: PageId,
@@ -75,16 +62,16 @@ impl Debug for ThreadMemoryMapping {
 }
 
 #[derive(Default)]
-pub struct ThreadVmState {
+pub struct VmState {
     pub pc: u32,
     pub hi: u32,
     pub lo: u32,
     pub reg: [u32; 32],
 }
 
-impl Debug for ThreadVmState {
+impl Debug for VmState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ThreadVmState")
+        f.debug_struct("VmState")
             .field("pc", &self.pc)
             .field("hi", &self.hi)
             .field("lo", &self.lo)
@@ -221,7 +208,7 @@ fn unlikely(b: bool) -> bool {
     b
 }
 
-pub enum ThreadRunResult {
+pub enum TaskRunResult {
     Continue,
     Wait(u32),
     Exit(u32, u32),
@@ -232,7 +219,7 @@ pub type VmInstruction = u32;
 pub type VmInstructionAddress = VmPtr;
 
 #[derive(Debug)]
-pub enum ThreadError {
+pub enum TaskError {
     DivByZeroError(VmInstructionAddress),
     MemoryDoesNotExistError(VmPtr, VmInstructionAddress),
     InvalidOperation(VmInstructionAddress, VmInstruction),
@@ -240,35 +227,35 @@ pub enum ThreadError {
     OverflowError(VmInstructionAddress),
 }
 
-pub struct ThreadMemory<'a> {
+pub struct TaskMemory<'a> {
     pub ll_bit: &'a mut bool,
     pub mem: [Option<&'a mut Page>; 0x10000],
 }
 
-impl<'a> ThreadMemory<'a> {
+impl<'a> TaskMemory<'a> {
     pub fn new(tmp_bool: &'a mut bool) -> Self {
         const NONE_C: Option<&'static mut Page> = None;
-        ThreadMemory {
+        TaskMemory {
             ll_bit: tmp_bool,
             mem: [NONE_C; 0x10000],
         }
     }
 }
 
-impl Thread {
+impl Task {
     pub fn run(
         &mut self,
         sys: &mut SystemCore,
-        mem: &mut ThreadMemory<'_>,
+        mem: &mut TaskMemory<'_>,
         iterations: u32,
-    ) -> Result<ThreadRunResult, ThreadError> {
+    ) -> Result<TaskRunResult, TaskError> {
         let mut ins_cache = {
             (
                 {
                     match &mut mem.mem[0] {
                         Some(page) => *page as *const [u8; 0x10000],
                         None => {
-                            return Err(ThreadError::MemoryDoesNotExistError(
+                            return Err(TaskError::MemoryDoesNotExistError(
                                 self.vm_state.pc,
                                 self.vm_state.pc,
                             ))
@@ -278,31 +265,20 @@ impl Thread {
                 self.vm_state.pc >> 16,
             )
         };
-        // let mut mem_cache = {
-        //     (
-        //         mem.mem[0].as_mut().map_or_else(||Err(ThreadError::MemoryDoesNotExistError(self.vm_state.pc)), Ok)?,
-        //         0,
-        //     )
-        // };
 
         macro_rules! set_mem_alligned {
             ($add:expr, $val:expr, $fn_type:ty) => {
                 unsafe {
                     let address = $add;
-                    // if unlikely(address >> 16 != mem_cache.1) {
-                    //     mem_cache = (
-                    //         mem.mem[address as usize].as_mut().map_or_else(||Err(ThreadError::MemoryDoesNotExistError(self.vm_state.pc)), Ok)?,
-                    //         address >> 16,
-                    //     );
-                    // }
 
-                    let page = match &mut mem.mem[address as usize >> 16]{
-                        Some(page) => {
-                            page
-                        },
+                    let page = match &mut mem.mem[address as usize >> 16] {
+                        Some(page) => page,
                         None => {
-                            return Err(ThreadError::MemoryDoesNotExistError(address, self.vm_state.pc))
-                        },
+                            return Err(TaskError::MemoryDoesNotExistError(
+                                address,
+                                self.vm_state.pc,
+                            ))
+                        }
                     };
                     let item = page.get_unchecked_mut(address as u16 as usize);
                     *core::mem::transmute::<&mut u8, &mut $fn_type>(item) = $val
@@ -314,19 +290,13 @@ impl Thread {
             ($add:expr, $fn_type:ty) => {
                 unsafe {
                     let address = $add;
-                    // if unlikely(address >> 16 != mem_cache.1) {
-                    //     mem_cache = (
-                    //         mem.mem[address as usize].as_mut().map_or_else(||Err(ThreadError::MemoryDoesNotExistError(self.vm_state.pc)), Ok)?,
-                    //         address >> 16,
-                    //     );
-                    // }
 
                     let page = match &mut mem.mem[address as usize >> 16]{
                         Some(page) => {
                             page
                         },
                         None => {
-                            return Err(ThreadError::MemoryDoesNotExistError(address, self.vm_state.pc))
+                            return Err(TaskError::MemoryDoesNotExistError(address, self.vm_state.pc))
                         },
                     };
                     let item = page.get_unchecked_mut(address as u16 as usize);
@@ -355,7 +325,7 @@ impl Thread {
                             match &mem.mem[self.vm_state.pc as usize >> 16] {
                                 Some(page) => *page as *const [u8; 0x10000],
                                 None => {
-                                    return Err(ThreadError::MemoryDoesNotExistError(
+                                    return Err(TaskError::MemoryDoesNotExistError(
                                         self.vm_state.pc,
                                         self.vm_state.pc,
                                     ))
@@ -379,22 +349,22 @@ impl Thread {
                             if let Some(reason) = reason {
                                 return Err(reason)
                             }else{
-                                return Err(ThreadError::InvalidOperation(self.vm_state.pc, op))
+                                return Err(TaskError::InvalidOperation(self.vm_state.pc, op))
                             }
                         },
                         crate::system::InterfaceCallResult::Exit => {
-                            return Ok(ThreadRunResult::Exit(ran, 0))
+                            return Ok(TaskRunResult::Exit(ran, 0))
                         }
                         crate::system::InterfaceCallResult::InvalidCall(id) => {
-                            return Err(ThreadError::InvalidOperation(self.vm_state.pc, id))
+                            return Err(TaskError::InvalidOperation(self.vm_state.pc, id))
                         },
                         crate::system::InterfaceCallResult::MalformedCallArgs => {
 
-                            return Err(ThreadError::InvalidOperation(self.vm_state.pc, op))
+                            return Err(TaskError::InvalidOperation(self.vm_state.pc, op))
                         }
                         crate::system::InterfaceCallResult::Wait => {
                             self.vm_state.pc -= 4; //we need to re-run this system call when we try again
-                            return Ok(ThreadRunResult::Wait(ran))
+                            return Ok(TaskRunResult::Wait(ran))
                         },
                     }
                 }
@@ -421,7 +391,7 @@ impl Thread {
                                 }
 
                                 None => {
-                                    return Err(ThreadError::OverflowError(self.vm_state.pc));
+                                    return Err(TaskError::OverflowError(self.vm_state.pc));
                                 }
                             }
                         }
@@ -443,7 +413,7 @@ impl Thread {
                                 self.vm_state.lo = (s.wrapping_div(t)) as u32;
                                 self.vm_state.hi = (s.wrapping_rem(t)) as u32;
                             } else {
-                                return Err(ThreadError::DivByZeroError(self.vm_state.pc));
+                                return Err(TaskError::DivByZeroError(self.vm_state.pc));
                             }
                         }
                         0b011011 => {
@@ -454,7 +424,7 @@ impl Thread {
                                 self.vm_state.lo = s.wrapping_div(t);
                                 self.vm_state.hi = s.wrapping_rem(t);
                             } else {
-                                return Err(ThreadError::DivByZeroError(self.vm_state.pc));
+                                return Err(TaskError::DivByZeroError(self.vm_state.pc));
                             }
                         }
                         0b011000 => {
@@ -532,7 +502,7 @@ impl Thread {
                             {
                                 self.vm_state.reg[register_d!(op)] = val as u32;
                             } else {
-                                return Err(ThreadError::OverflowError(self.vm_state.pc));
+                                return Err(TaskError::OverflowError(self.vm_state.pc));
                             }
                         }
                         0b100011 => {
@@ -662,7 +632,7 @@ impl Thread {
                             }
                         }
 
-                        _ => return Err(ThreadError::InvalidOperation(self.vm_state.pc, op)),
+                        _ => return Err(TaskError::InvalidOperation(self.vm_state.pc, op)),
                     }
                 }
                 //Jump instructions
@@ -687,7 +657,7 @@ impl Thread {
                     {
                         self.vm_state.reg[immediate_t!(op)] = val as u32;
                     } else {
-                        return Err(ThreadError::OverflowError(self.vm_state.pc));
+                        return Err(TaskError::OverflowError(self.vm_state.pc));
                     }
                 }
                 0b001001 => {
@@ -777,7 +747,7 @@ impl Thread {
                                 self.vm_state.pc += 4;
                             }
                         }
-                        _ => return Err(ThreadError::InvalidOperation(self.vm_state.pc, op)),
+                        _ => return Err(TaskError::InvalidOperation(self.vm_state.pc, op)),
                     }
                 }
                 0b000111 => {
@@ -893,7 +863,7 @@ impl Thread {
                             get_mem_alligned!(address, i16) as u32;
                     //self.mem.get_i16_alligned(address) as u32
                     } else {
-                        return Err(ThreadError::MemoryAllignmentError(2, self.vm_state.pc));
+                        return Err(TaskError::MemoryAllignmentError(2, self.vm_state.pc));
                     }
                 }
                 0b100101 => {
@@ -907,7 +877,7 @@ impl Thread {
                             get_mem_alligned!(address, u16) as u32;
                     //self.mem.get_u16_alligned(address) as u32
                     } else {
-                        return Err(ThreadError::MemoryAllignmentError(2, self.vm_state.pc));
+                        return Err(TaskError::MemoryAllignmentError(2, self.vm_state.pc));
                     }
                 }
                 0b100011 => {
@@ -920,7 +890,7 @@ impl Thread {
                         self.vm_state.reg[immediate_t!(op)] = get_mem_alligned!(address, u32);
                     //self.mem.get_u32_alligned(address) as u32
                     } else {
-                        return Err(ThreadError::MemoryAllignmentError(4, self.vm_state.pc));
+                        return Err(TaskError::MemoryAllignmentError(4, self.vm_state.pc));
                     }
                 }
 
@@ -935,7 +905,7 @@ impl Thread {
                         self.vm_state.reg[immediate_t!(op)] = get_mem_alligned!(address, u32);
                     //self.mem.get_u32_alligned(address) as u32
                     } else {
-                        return Err(ThreadError::MemoryAllignmentError(4, self.vm_state.pc));
+                        return Err(TaskError::MemoryAllignmentError(4, self.vm_state.pc));
                     }
                 }
                 0b111000 => {
@@ -946,9 +916,6 @@ impl Thread {
 
                     if likely(address & 0b11 == 0) {
                         if *mem.ll_bit {
-                            // if address < 0x10000{
-                            //     println!("thread: {}: av{:010X} -> m{:010X}", self.id(),self.vm_state.reg[immediate_t!(op)], address )
-                            // }
                             set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)], u32);
                             self.vm_state.reg[immediate_t!(op)] = 1;
                         } else {
@@ -957,7 +924,7 @@ impl Thread {
                         *mem.ll_bit = false;
                     } else {
                         self.vm_state.reg[immediate_t!(op)] = 0;
-                        return Err(ThreadError::MemoryAllignmentError(4, self.vm_state.pc));
+                        return Err(TaskError::MemoryAllignmentError(4, self.vm_state.pc));
                     }
                 }
 
@@ -967,9 +934,7 @@ impl Thread {
                     let address = ((self.vm_state.reg[immediate_s!(op)] as i32)
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
-                    // if address < 0x10000{
-                    //     println!("thread: {}: v{:04X} -> m{:010X}", self.id(),self.vm_state.reg[immediate_t!(op)] as u8, address )
-                    // }
+
                     *mem.ll_bit = false;
                     set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)] as u8, u8);
                 }
@@ -978,14 +943,12 @@ impl Thread {
                     let address = ((self.vm_state.reg[immediate_s!(op)] as i32)
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
-                    // if address < 0x10000{
-                    //     println!("thread: {}: v{:06X} -> m{:010X}", self.id(),self.vm_state.reg[immediate_t!(op)] as u16, address )
-                    // }
+
                     if likely(address & 0b1 == 0) {
                         *mem.ll_bit = false;
                         set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)] as u16, u16);
                     } else {
-                        return Err(ThreadError::MemoryAllignmentError(2, self.vm_state.pc));
+                        return Err(TaskError::MemoryAllignmentError(2, self.vm_state.pc));
                     }
                 }
                 0b101011 => {
@@ -994,19 +957,17 @@ impl Thread {
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
                     if likely(address & 0b11 == 0) {
-                        // if address < 0x10000{
-                        //     println!("thread: {}: v{:010X} -> m{:010X}", self.id(),self.vm_state.reg[immediate_t!(op)], address )
-                        // }
+ 
                         *mem.ll_bit = false;
                         set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)], u32);
                     } else {
-                        return Err(ThreadError::MemoryAllignmentError(4, self.vm_state.pc));
+                        return Err(TaskError::MemoryAllignmentError(4, self.vm_state.pc));
                     }
                 }
 
-                _ => return Err(ThreadError::InvalidOperation(self.vm_state.pc, op)),
+                _ => return Err(TaskError::InvalidOperation(self.vm_state.pc, op)),
             }
         }
-        Ok(ThreadRunResult::Continue)
+        Ok(TaskRunResult::Continue)
     }
 }

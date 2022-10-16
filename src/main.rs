@@ -19,7 +19,7 @@ fn main() {
                     for arg in next.split(',') {
                         let arg = arg.trim();
 
-                        let pages = system.add_thread([0x0, 0x7FFF]);
+                        let pages = system.add_task_with_pages([0x0, 0x7FFF]);
                         let mut file = std::fs::File::open(arg).unwrap();
                         // let mut buf = Vec::new();
                         let ammount = file.read(pages[0]).unwrap();
@@ -37,5 +37,5 @@ fn main() {
     }
 
     system.run();
-    println!("All threads exited shutting down");
+    println!("All tasks terminated, shutting down");
 }

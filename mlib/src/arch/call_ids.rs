@@ -45,9 +45,9 @@ pub const CURRENT_TIME_NANOS: u32 = 60;
 pub const GENERATE_THREAD_RANDOM_NUMBER: u32 = 99;
 
 /// Start a new thread
-/// 
+///
 /// Register 4: Pointer to thread entry
 /// Register 5: Pointer to thread arguments
-/// 
-/// Register 2: Non zero Id of created thread (if zero an error occured) 
+///
+/// Register 2: Non zero Id of created thread (if zero an error occured)
 pub const START_NEW_THREAD: u32 = 100;

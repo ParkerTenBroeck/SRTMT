@@ -2,13 +2,11 @@ use core::{fmt::Display, num::NonZeroU32};
 
 use crate::arch::START_NEW_THREAD;
 
-
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-
 
 #[cfg(feature = "alloc")]
 pub fn start_new_thread<F, T>(f: F) -> Result<ThreadJoinHandle, ()>

@@ -208,4 +208,3 @@ pub unsafe fn syscall_ss_s<const CALL_ID: u32>(arg1: u32, arg2: u32) -> u32 {
     );
     ret1
 }
-

@@ -111,6 +111,8 @@ impl System {
     ) -> [&mut Page; SIZE] {
         let mut task = Task::new(self.core.next_task_id());
 
+        let initial_len = self.tasks.sys_mem.v_mem.len();
+
         for page in initial_pages {
             task
                 .memory_mapping
@@ -119,18 +121,22 @@ impl System {
             self.tasks.sys_mem.v_mem.push([0; 0x10000]);
         }
 
+        let pid = task.pid();
+        self.add_task(task);
+
         let mut t = Vec::new();
 
         let mut start_page_id = 0usize;
         let mut pages = self.tasks.sys_mem.v_mem.as_mut_slice();
+        
 
-        for (page_id, _) in &task.memory_mapping.mapping {
+        for page_id in initial_len..(initial_len + SIZE){
             pages = &mut pages[(page_id - start_page_id)..];
             match std::mem::take(&mut pages) {
                 [] => panic!(
                     "Page mapping doesnt exist: page_id: {} for task: {}",
                     page_id,
-                    task.pid()
+                    pid
                 ),
                 [first, rest @ ..] => {
                     pages = rest;
@@ -139,10 +145,8 @@ impl System {
                     t.push(first);
                 }
             }
-            start_page_id = *page_id + 1;
+            start_page_id = page_id + 1;
         }
-
-        self.tasks.task_pool.push(task);
 
         t.try_into().unwrap()
     }

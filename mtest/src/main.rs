@@ -5,9 +5,23 @@ use mlib::*;
 
 #[no_mangle]
 fn main() {
-    for _ in 0..10 {
-        println!("Hello World!");
+    for i in 0..50_000u32 {
+        if is_prime(i) {
+            println!("{i} is prime");
+        }
     }
+}
+
+fn is_prime(n: u32) -> bool {
+    if n <= 1 {
+        return false;
+    }
+    for a in 2..n {
+        if n % a == 0 {
+            return false; // if it is not the last statement you need to use `return`
+        }
+    }
+    true // last value to return
 }
 
 #[panic_handler]

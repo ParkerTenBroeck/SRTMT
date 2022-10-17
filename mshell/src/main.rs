@@ -11,8 +11,11 @@ fn main() {
         for i in 0..number {
             println!("NEW THREAD: {}", i);
             let _ = mlib::thread::start_new_thread(move || {
-                println!("{} ON A NEW THREAD", i);
-                // panic!();
+                for i in 0..5_000u32 {
+                    if is_prime(i) {
+                        println!("{i} is prime");
+                    }
+                }
             })
             .unwrap();
         }
@@ -23,6 +26,18 @@ fn main() {
     for i in 0..5 {
         println!("Shell: {}", i);
     }
+}
+
+fn is_prime(n: u32) -> bool {
+    if n <= 1 {
+        return false;
+    }
+    for a in 2..n {
+        if n % a == 0 {
+            return false; // if it is not the last statement you need to use `return`
+        }
+    }
+    true // last value to return
 }
 
 #[panic_handler]

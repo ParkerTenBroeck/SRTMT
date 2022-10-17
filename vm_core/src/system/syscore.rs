@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     scheduler::Scheduler,
-    task::{Task, TaskMemory, TaskError},
+    task::{Task, TaskError, TaskMemory},
     util::ProcessId,
 };
 
@@ -31,11 +31,7 @@ impl SystemCore {
         match id {
             0 => return InterfaceCallResult::Exit,
             1 => {
-                println!(
-                    "Task: {} -> {}",
-                    task.pid(),
-                    task.vm_state.reg[4] as i32
-                );
+                tracing::info!("Task: {} -> {}", task.pid(), task.vm_state.reg[4] as i32);
             }
             4 => {
                 let mut address = task.vm_state.reg[4];
@@ -60,7 +56,7 @@ impl SystemCore {
 
                 let str = String::from_utf8(str);
                 if let Ok(str) = str {
-                    println!("Task: {} -> {}", task.pid(), str);
+                    tracing::info!("Task: {} -> {}", task.pid(), str);
                 } else {
                     return InterfaceCallResult::MalformedCallArgs;
                 }
@@ -80,9 +76,9 @@ impl SystemCore {
                             .push(char);
                     }
                 } else if let Some(msg) = self.partial_process_output.remove(&task.pid()) {
-                    println!("Task: {} -> {}", task.pid(), msg);
+                    tracing::info!("Task: {} -> {}", task.pid(), msg);
                 } else {
-                    println!("Task: {} -> ", task.pid());
+                    tracing::info!("Task: {} -> ", task.pid());
                 }
             }
             100 => {

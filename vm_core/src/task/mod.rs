@@ -291,13 +291,14 @@ impl Task {
                 unsafe {
                     let address = $add;
 
-                    let page = match &mut mem.mem[address as usize >> 16]{
-                        Some(page) => {
-                            page
-                        },
+                    let page = match &mut mem.mem[address as usize >> 16] {
+                        Some(page) => page,
                         None => {
-                            return Err(TaskError::MemoryDoesNotExistError(address, self.vm_state.pc))
-                        },
+                            return Err(TaskError::MemoryDoesNotExistError(
+                                address,
+                                self.vm_state.pc,
+                            ))
+                        }
                     };
                     let item = page.get_unchecked_mut(address as u16 as usize);
                     *core::mem::transmute::<&u8, &$fn_type>(item)
@@ -957,7 +958,6 @@ impl Task {
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
                     if likely(address & 0b11 == 0) {
- 
                         *mem.ll_bit = false;
                         set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)], u32);
                     } else {

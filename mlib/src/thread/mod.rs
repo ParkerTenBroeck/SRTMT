@@ -1,4 +1,4 @@
-use core::{fmt::Display, num::NonZeroU32};
+use core::{fmt::Display, num::NonZeroU32, time::Duration};
 
 use crate::arch::START_NEW_THREAD;
 
@@ -65,5 +65,14 @@ pub struct ThreadJoinHandle {
 impl Display for ThreadJoinHandle {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.id)
+    }
+}
+
+
+pub fn sleep(dur: Duration) {
+    let nanos = dur.as_nanos() as u64;
+    unsafe{
+        use crate::arch::SLEEP_NANOS;
+        crate::arch::syscall_d_v::<SLEEP_NANOS>(nanos);
     }
 }

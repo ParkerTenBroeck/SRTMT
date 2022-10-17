@@ -145,6 +145,22 @@ pub unsafe fn syscall_ss_v<const CALL_ID: u32>(arg1: u32, arg2: u32) {
 /// If you have to read this then you shouldnt be using this. This is a raw System Call, using it
 /// incorrectly can break pretty much anything.
 #[inline(always)]
+pub unsafe fn syscall_d_v<const CALL_ID: u32>(arg1: u64) {
+    let a1 = (arg1 >> 32) as u32;
+    let a0 = arg1 as u32;
+    asm!(
+        "syscall {0}",
+        const(CALL_ID),
+        in("$4") a0,
+        in("$5") a1,
+    );
+}
+
+/// # Safety
+///
+/// If you have to read this then you shouldnt be using this. This is a raw System Call, using it
+/// incorrectly can break pretty much anything.
+#[inline(always)]
 pub unsafe fn syscall_sss_v<const CALL_ID: u32>(arg1: u32, arg2: u32, arg3: u32) {
     asm!(
         "syscall {0}",

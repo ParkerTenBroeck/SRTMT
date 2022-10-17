@@ -53,6 +53,10 @@ fn main() {
             run_cmd.arg("--release");
         }
 
+        run_cmd.arg("--package");
+        run_cmd.arg("srtmt");
+        
+
         run_cmd.args(unreconized);
 
         run_cmd.arg("--").arg("-B").arg(str);

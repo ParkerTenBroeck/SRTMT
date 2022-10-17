@@ -11,6 +11,16 @@
 #![feature(generic_const_exprs)]
 #![feature(box_syntax)]
 
+
+// #[cfg(not(nightly))]
+// compile_error!("ONLY NIGHTLY SUPPORTED");
+
+// #[cfg(not(target = "mips"))]
+// compile_error!("ONLY MIPS ARCHITECTURE SUPPORTED");
+
+// #[cfg(not(target_endian = "little"))]
+// compile_error!("NOT LITTLE ENDIAN");
+
 pub mod arch;
 pub mod core_rust;
 pub mod io;

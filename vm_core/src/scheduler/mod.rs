@@ -1,8 +1,9 @@
 use std::{
     collections::BinaryHeap,
-    time::{Duration, SystemTime},
+    time::{Duration},
 };
 
+use crate::SystemTime;
 use crate::util::ProcessId;
 
 /// The Scheduler to schedule what task will run and for how long
@@ -16,7 +17,7 @@ pub struct Scheduler {
     average_instructions: RollingAverage,
     average_vm_duration: RollingAverage,
     average_total_duration: RollingAverage,
-    current_time: Option<u128>,
+    current_time: Option<SystemTime>,
 }
 
 #[derive(Debug)]
@@ -84,22 +85,37 @@ impl Scheduler {
     }
 
     pub fn schedule_next_task(&mut self) -> (ProcessId, u32) {
+
+        let now = crate::systime_now();
+        if let Some(last_time) = self.current_time{
+            let dur = now.duration_since(last_time).unwrap().as_nanos();
+            self.average_total_duration.roll(dur as i128); 
+        }
+        self.current_time = Some(now);
+
+        let task = self.task_list.peek_mut().unwrap();
+        if task.time_available_to_run().gt(&now){
+            let dur = task.time_available_to_run().duration_since(now).unwrap();
+            crate::wait_for(dur);
+            self.current_time = Some(crate::systime_now());
+        }
+
         let iterations = (self.average_instructions.average() * 200000)
             .checked_div(self.average_vm_duration.average())
             .unwrap_or(500);
-        (self.task_list.peek_mut().unwrap().pid, iterations as u32)
+        (task.pid, iterations as u32)
     }
 
     pub fn scheduled_task_report(
         &mut self,
-        _pid: ProcessId,
+        pid: ProcessId,
         iterations: u32,
         start: SystemTime,
         end: SystemTime,
     ) {
         if self
             .tasks_to_remove
-            .contains(&self.task_list.peek().unwrap().pid)
+            .contains(&pid)
         {
             self.task_list.pop();
         } else {

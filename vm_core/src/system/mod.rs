@@ -1,5 +1,6 @@
 pub mod syscore;
-use std::time::SystemTime;
+
+use crate::SystemTime;
 
 pub use syscore::*;
 
@@ -186,9 +187,9 @@ impl System {
             start_page_id = *page_id + 1;
         }
 
-        let start = std::time::SystemTime::now();
+        let start = crate::systime_now();
         let res = task.run(&mut self.core, mem, iters);
-        let end = std::time::SystemTime::now();
+        let end = crate::systime_now();
 
         for (_, v_addr) in &task.memory_mapping.mapping {
             mem.mem[*v_addr as usize] = None;

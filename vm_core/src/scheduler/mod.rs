@@ -1,13 +1,10 @@
-use std::{
-    collections::BinaryHeap,
-    time::{Duration},
-};
+use std::{collections::BinaryHeap, time::Duration};
 
-use crate::SystemTime;
 use crate::util::ProcessId;
+use crate::SystemTime;
 
 /// The Scheduler to schedule what task will run and for how long
-/// 
+///
 /// Currently it just picks the task with the oldest value for (last_ran + sleep_for)
 #[derive(Default)]
 pub struct Scheduler {
@@ -43,7 +40,8 @@ impl PartialOrd for SchedulerTask {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(
             //backwards *^*
-            other.time_available_to_run()
+            other
+                .time_available_to_run()
                 .cmp(&self.time_available_to_run()),
         )
     }
@@ -82,7 +80,7 @@ impl Scheduler {
         self.task_list.push(SchedulerTask::new(pid));
     }
 
-    pub fn total_iterations(&self) -> u64{
+    pub fn total_iterations(&self) -> u64 {
         self.total_iterations
     }
 
@@ -91,14 +89,12 @@ impl Scheduler {
     }
 
     pub fn schedule_next_task(&mut self) -> Option<(ProcessId, u32)> {
-
         let now = crate::systime_now();
-        if let Some(last_time) = self.current_time{
+        if let Some(last_time) = self.current_time {
             let dur = now.duration_since(last_time).unwrap().as_nanos();
-            self.average_total_duration.roll(dur as i128); 
+            self.average_total_duration.roll(dur as i128);
         }
         self.current_time = Some(now);
-
 
         while !self.task_list.is_empty() {
             if self
@@ -114,8 +110,8 @@ impl Scheduler {
         }
 
         let task = self.task_list.peek_mut()?;
-        
-        if task.time_available_to_run().gt(&now){
+
+        if task.time_available_to_run().gt(&now) {
             let dur = task.time_available_to_run().duration_since(now).unwrap();
             crate::wait_for(dur);
             self.current_time = Some(crate::systime_now());
@@ -139,11 +135,11 @@ impl Scheduler {
         self.average_vm_duration.roll(duration as i128);
         self.total_iterations += iterations as u64;
 
-        if !self.tasks_to_remove.contains(&pid){
+        if !self.tasks_to_remove.contains(&pid) {
             let mut task = self.task_list.pop().unwrap();
-    
+
             task.last_ran = start;
-    
+
             self.task_list.push(task);
         }
     }

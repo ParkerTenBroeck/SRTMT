@@ -68,10 +68,9 @@ impl Display for ThreadJoinHandle {
     }
 }
 
-
 pub fn sleep(dur: Duration) {
     let nanos = dur.as_nanos() as u64;
-    unsafe{
+    unsafe {
         use crate::arch::SLEEP_NANOS;
         crate::arch::syscall_d_v::<SLEEP_NANOS>(nanos);
     }

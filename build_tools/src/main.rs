@@ -55,7 +55,6 @@ fn main() {
 
         run_cmd.arg("--package");
         run_cmd.arg("srtmt");
-        
 
         run_cmd.args(unreconized);
 

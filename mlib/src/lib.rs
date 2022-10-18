@@ -11,7 +11,6 @@
 #![feature(generic_const_exprs)]
 #![feature(box_syntax)]
 
-
 // #[cfg(not(nightly))]
 // compile_error!("ONLY NIGHTLY SUPPORTED");
 

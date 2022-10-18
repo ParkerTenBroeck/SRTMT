@@ -255,10 +255,13 @@ impl Task {
                     match &mut mem.mem[0] {
                         Some(page) => *page as *const [u8; 0x10000],
                         None => {
-                            return Err((TaskError::MemoryDoesNotExistError(
-                                self.vm_state.pc,
-                                self.vm_state.pc,
-                            ),0))
+                            return Err((
+                                TaskError::MemoryDoesNotExistError(
+                                    self.vm_state.pc,
+                                    self.vm_state.pc,
+                                ),
+                                0,
+                            ))
                         }
                     }
                 },
@@ -266,23 +269,19 @@ impl Task {
             )
         };
 
-
-
         for ran in 0..iterations {
-
-
             macro_rules! set_mem_alligned {
                 ($add:expr, $val:expr, $fn_type:ty) => {
                     unsafe {
                         let address = $add;
-    
+
                         let page = match &mut mem.mem[address as usize >> 16] {
                             Some(page) => page,
                             None => {
-                                return Err((TaskError::MemoryDoesNotExistError(
-                                    address,
-                                    self.vm_state.pc,
-                                ), ran))
+                                return Err((
+                                    TaskError::MemoryDoesNotExistError(address, self.vm_state.pc),
+                                    ran,
+                                ))
                             }
                         };
                         let item = page.get_unchecked_mut(address as u16 as usize);
@@ -290,19 +289,19 @@ impl Task {
                     }
                 };
             }
-    
+
             macro_rules! get_mem_alligned {
                 ($add:expr, $fn_type:ty) => {
                     unsafe {
                         let address = $add;
-    
+
                         let page = match &mut mem.mem[address as usize >> 16] {
                             Some(page) => page,
                             None => {
-                                return Err((TaskError::MemoryDoesNotExistError(
-                                    address,
-                                    self.vm_state.pc,
-                                ),ran))
+                                return Err((
+                                    TaskError::MemoryDoesNotExistError(address, self.vm_state.pc),
+                                    ran,
+                                ))
                             }
                         };
                         let item = page.get_unchecked_mut(address as u16 as usize);
@@ -330,10 +329,13 @@ impl Task {
                             match &mem.mem[self.vm_state.pc as usize >> 16] {
                                 Some(page) => *page as *const [u8; 0x10000],
                                 None => {
-                                    return Err((TaskError::MemoryDoesNotExistError(
-                                        self.vm_state.pc,
-                                        self.vm_state.pc,
-                                    ),ran))
+                                    return Err((
+                                        TaskError::MemoryDoesNotExistError(
+                                            self.vm_state.pc,
+                                            self.vm_state.pc,
+                                        ),
+                                        ran,
+                                    ))
                                 }
                             }
                         },

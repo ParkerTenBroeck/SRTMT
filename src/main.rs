@@ -39,5 +39,8 @@ fn main() {
     let start = Instant::now();
     let iters = system.run_blocking();
     let dur = start.elapsed();
-    println!("All tasks terminated, ran vm for {} iterations in {:?}\nshutting down", iters, dur);
+    println!(
+        "All tasks terminated, ran vm for {} iterations in {:?}\nshutting down",
+        iters, dur
+    );
 }

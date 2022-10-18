@@ -53,6 +53,6 @@ pub const GENERATE_THREAD_RANDOM_NUMBER: u32 = 99;
 pub const START_NEW_THREAD: u32 = 100;
 
 /// Sleep nanoseconds
-/// 
-/// Register 4/5: number of nano seconds to sleep for 
+///
+/// Register 4/5: number of nano seconds to sleep for
 pub const SLEEP_NANOS: u32 = 101;

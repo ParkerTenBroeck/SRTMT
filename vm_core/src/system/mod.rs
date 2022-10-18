@@ -18,13 +18,12 @@ pub struct System {
 }
 
 impl System {
-    pub fn run_blocking(&mut self) -> u64{
+    pub fn run_blocking(&mut self) -> u64 {
         //well.... idk what you want from me??? better data structures pffff thats for nerds :)
         let mut shit_bool = false;
         let mut mem = TaskMemory::new(&mut shit_bool);
 
         while let Some((pid, iterations)) = self.core.scheduler.schedule_next_task() {
-
             let (res, start, end) = self.run_task(pid, &mut mem, iterations);
 
             self.post_task_stuff();
@@ -152,7 +151,11 @@ impl System {
         pid: ProcessId,
         mem: &mut TaskMemory<'c>,
         iters: u32,
-    ) -> (Result<TaskRunResult, (TaskError, u32)>, SystemTime, SystemTime) {
+    ) -> (
+        Result<TaskRunResult, (TaskError, u32)>,
+        SystemTime,
+        SystemTime,
+    ) {
         let task = self
             .tasks
             .task_pool

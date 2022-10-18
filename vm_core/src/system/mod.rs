@@ -18,13 +18,12 @@ pub struct System {
 }
 
 impl System {
-    pub fn run(&mut self) {
+    pub fn run_blocking(&mut self) -> u64{
         //well.... idk what you want from me??? better data structures pffff thats for nerds :)
         let mut shit_bool = false;
         let mut mem = TaskMemory::new(&mut shit_bool);
 
-        while self.core.scheduler.has_task() {
-            let (pid, iterations) = self.core.scheduler.schedule_next_task();
+        while let Some((pid, iterations)) = self.core.scheduler.schedule_next_task() {
 
             let (res, start, end) = self.run_task(pid, &mut mem, iterations);
 
@@ -40,7 +39,7 @@ impl System {
                         (actually_ran, true)
                     }
                 },
-                Err(err) => {
+                Err((err, ran)) => {
                     tracing::info!(
                         "Task: {} encountered an error: {:#?}\nDUMP: {:#?}\nTerminating",
                         pid,
@@ -48,13 +47,14 @@ impl System {
                         self.tasks.get_task(pid)
                     );
                     self.remove_task(pid);
-                    (iterations, false)
+                    (ran, false)
                 }
             };
             self.core
                 .scheduler
                 .scheduled_task_report(pid, iterations, start, end);
         }
+        self.core.scheduler.total_iterations()
     }
 
     fn post_task_stuff(&mut self) {
@@ -85,7 +85,7 @@ impl System {
             new_task.vm_state.reg[4] = new_task_info.argument_ptr; //ptr to arguments in memory
             new_task.vm_state.reg[29] = 0x80000000; //start of stack
             new_task.vm_state.reg[31] = 0xFFFFFFFF;
-            tracing::debug!(
+            tracing::info!(
                 "Created new task: {}\nDUMP{{:?}}",
                 new_task.pid(),
                 //new_task
@@ -152,7 +152,7 @@ impl System {
         pid: ProcessId,
         mem: &mut TaskMemory<'c>,
         iters: u32,
-    ) -> (Result<TaskRunResult, TaskError>, SystemTime, SystemTime) {
+    ) -> (Result<TaskRunResult, (TaskError, u32)>, SystemTime, SystemTime) {
         let task = self
             .tasks
             .task_pool

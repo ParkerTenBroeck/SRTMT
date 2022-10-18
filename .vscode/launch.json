@@ -20,5 +20,22 @@
             ],
             "cwd": "${workspaceFolder}"
         },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Release vm",
+            "preLaunchTask": "rust: cargo build",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--release"
+                ],
+            },
+            "args": [
+                "-B",
+                "${workspaceFolder}/target/mips/release/mshell.bin,${workspaceFolder}/target/mips/release/mtest.bin"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }

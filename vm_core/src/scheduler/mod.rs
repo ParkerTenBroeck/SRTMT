@@ -18,6 +18,8 @@ pub struct Scheduler {
     average_vm_duration: RollingAverage,
     average_total_duration: RollingAverage,
     current_time: Option<SystemTime>,
+
+    total_iterations: u64,
 }
 
 #[derive(Debug)]
@@ -50,7 +52,7 @@ impl PartialOrd for SchedulerTask {
 impl Ord for SchedulerTask {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // our partial cmp is absolute
-        Self::partial_cmp(&self, other).unwrap()
+        Self::partial_cmp(self, other).unwrap()
     }
 }
 
@@ -80,11 +82,15 @@ impl Scheduler {
         self.task_list.push(SchedulerTask::new(pid));
     }
 
+    pub fn total_iterations(&self) -> u64{
+        self.total_iterations
+    }
+
     pub fn remove_task(&mut self, pid: ProcessId) {
         self.tasks_to_remove.push(pid);
     }
 
-    pub fn schedule_next_task(&mut self) -> (ProcessId, u32) {
+    pub fn schedule_next_task(&mut self) -> Option<(ProcessId, u32)> {
 
         let now = crate::systime_now();
         if let Some(last_time) = self.current_time{
@@ -93,42 +99,7 @@ impl Scheduler {
         }
         self.current_time = Some(now);
 
-        let task = self.task_list.peek_mut().unwrap();
-        if task.time_available_to_run().gt(&now){
-            let dur = task.time_available_to_run().duration_since(now).unwrap();
-            crate::wait_for(dur);
-            self.current_time = Some(crate::systime_now());
-        }
 
-        let iterations = (self.average_instructions.average() * 200000)
-            .checked_div(self.average_vm_duration.average())
-            .unwrap_or(500);
-        (task.pid, iterations as u32)
-    }
-
-    pub fn scheduled_task_report(
-        &mut self,
-        pid: ProcessId,
-        iterations: u32,
-        start: SystemTime,
-        end: SystemTime,
-    ) {
-        if self
-            .tasks_to_remove
-            .contains(&pid)
-        {
-            self.task_list.pop();
-        } else {
-            let mut task = self.task_list.pop().unwrap();
-
-            let duration = (end.duration_since(start).unwrap()).as_nanos();
-            self.average_instructions.roll(iterations as i128);
-            self.average_vm_duration.roll(duration as i128);
-
-            task.last_ran = start;
-
-            self.task_list.push(task);
-        }
         while !self.task_list.is_empty() {
             if self
                 .tasks_to_remove
@@ -140,6 +111,40 @@ impl Scheduler {
             } else {
                 break;
             }
+        }
+
+        let task = self.task_list.peek_mut()?;
+        
+        if task.time_available_to_run().gt(&now){
+            let dur = task.time_available_to_run().duration_since(now).unwrap();
+            crate::wait_for(dur);
+            self.current_time = Some(crate::systime_now());
+        }
+
+        let iterations = (self.average_instructions.average() * 200000)
+            .checked_div(self.average_vm_duration.average())
+            .unwrap_or(500);
+        Some((task.pid, iterations as u32))
+    }
+
+    pub fn scheduled_task_report(
+        &mut self,
+        pid: ProcessId,
+        iterations: u32,
+        start: SystemTime,
+        end: SystemTime,
+    ) {
+        let duration = (end.duration_since(start).unwrap()).as_nanos();
+        self.average_instructions.roll(iterations as i128);
+        self.average_vm_duration.roll(duration as i128);
+        self.total_iterations += iterations as u64;
+
+        if !self.tasks_to_remove.contains(&pid){
+            let mut task = self.task_list.pop().unwrap();
+    
+            task.last_ran = start;
+    
+            self.task_list.push(task);
         }
     }
 

@@ -5,7 +5,7 @@ use mlib::*;
 
 #[no_mangle]
 fn main() {
-    for i in 0..50_000u32 {
+    for i in 0..50u32 {
         if is_prime(i) {
             println!("{i} is prime");
         }

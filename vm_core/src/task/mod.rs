@@ -248,17 +248,17 @@ impl Task {
         sys: &mut SystemCore,
         mem: &mut TaskMemory<'_>,
         iterations: u32,
-    ) -> Result<TaskRunResult, TaskError> {
+    ) -> Result<TaskRunResult, (TaskError, u32)> {
         let mut ins_cache = {
             (
                 {
                     match &mut mem.mem[0] {
                         Some(page) => *page as *const [u8; 0x10000],
                         None => {
-                            return Err(TaskError::MemoryDoesNotExistError(
+                            return Err((TaskError::MemoryDoesNotExistError(
                                 self.vm_state.pc,
                                 self.vm_state.pc,
-                            ))
+                            ),0))
                         }
                     }
                 },
@@ -266,47 +266,51 @@ impl Task {
             )
         };
 
-        macro_rules! set_mem_alligned {
-            ($add:expr, $val:expr, $fn_type:ty) => {
-                unsafe {
-                    let address = $add;
 
-                    let page = match &mut mem.mem[address as usize >> 16] {
-                        Some(page) => page,
-                        None => {
-                            return Err(TaskError::MemoryDoesNotExistError(
-                                address,
-                                self.vm_state.pc,
-                            ))
-                        }
-                    };
-                    let item = page.get_unchecked_mut(address as u16 as usize);
-                    *core::mem::transmute::<&mut u8, &mut $fn_type>(item) = $val
-                }
-            };
-        }
-
-        macro_rules! get_mem_alligned {
-            ($add:expr, $fn_type:ty) => {
-                unsafe {
-                    let address = $add;
-
-                    let page = match &mut mem.mem[address as usize >> 16] {
-                        Some(page) => page,
-                        None => {
-                            return Err(TaskError::MemoryDoesNotExistError(
-                                address,
-                                self.vm_state.pc,
-                            ))
-                        }
-                    };
-                    let item = page.get_unchecked_mut(address as u16 as usize);
-                    *core::mem::transmute::<&u8, &$fn_type>(item)
-                }
-            };
-        }
 
         for ran in 0..iterations {
+
+
+            macro_rules! set_mem_alligned {
+                ($add:expr, $val:expr, $fn_type:ty) => {
+                    unsafe {
+                        let address = $add;
+    
+                        let page = match &mut mem.mem[address as usize >> 16] {
+                            Some(page) => page,
+                            None => {
+                                return Err((TaskError::MemoryDoesNotExistError(
+                                    address,
+                                    self.vm_state.pc,
+                                ), ran))
+                            }
+                        };
+                        let item = page.get_unchecked_mut(address as u16 as usize);
+                        *core::mem::transmute::<&mut u8, &mut $fn_type>(item) = $val
+                    }
+                };
+            }
+    
+            macro_rules! get_mem_alligned {
+                ($add:expr, $fn_type:ty) => {
+                    unsafe {
+                        let address = $add;
+    
+                        let page = match &mut mem.mem[address as usize >> 16] {
+                            Some(page) => page,
+                            None => {
+                                return Err((TaskError::MemoryDoesNotExistError(
+                                    address,
+                                    self.vm_state.pc,
+                                ),ran))
+                            }
+                        };
+                        let item = page.get_unchecked_mut(address as u16 as usize);
+                        *core::mem::transmute::<&u8, &$fn_type>(item)
+                    }
+                };
+            }
+
             macro_rules! system_call {
                 ($id:expr) => {
                     interface_call!(system_call, $id);
@@ -326,10 +330,10 @@ impl Task {
                             match &mem.mem[self.vm_state.pc as usize >> 16] {
                                 Some(page) => *page as *const [u8; 0x10000],
                                 None => {
-                                    return Err(TaskError::MemoryDoesNotExistError(
+                                    return Err((TaskError::MemoryDoesNotExistError(
                                         self.vm_state.pc,
                                         self.vm_state.pc,
-                                    ))
+                                    ),ran))
                                 }
                             }
                         },
@@ -348,20 +352,20 @@ impl Task {
                         crate::system::InterfaceCallResult::Continue => {},
                         crate::system::InterfaceCallResult::ImmediateKill(reason) => {
                             if let Some(reason) = reason {
-                                return Err(reason)
+                                return Err((reason, ran))
                             }else{
-                                return Err(TaskError::InvalidOperation(self.vm_state.pc, op))
+                                return Err((TaskError::InvalidOperation(self.vm_state.pc, op),ran))
                             }
                         },
                         crate::system::InterfaceCallResult::Exit => {
                             return Ok(TaskRunResult::Exit(ran, 0))
                         }
                         crate::system::InterfaceCallResult::InvalidCall(id) => {
-                            return Err(TaskError::InvalidOperation(self.vm_state.pc, id))
+                            return Err((TaskError::InvalidOperation(self.vm_state.pc, id),ran))
                         },
                         crate::system::InterfaceCallResult::MalformedCallArgs => {
 
-                            return Err(TaskError::InvalidOperation(self.vm_state.pc, op))
+                            return Err((TaskError::InvalidOperation(self.vm_state.pc, op), ran))
                         }
                         crate::system::InterfaceCallResult::Wait => {
                             self.vm_state.pc -= 4; //we need to re-run this system call when we try again
@@ -392,7 +396,7 @@ impl Task {
                                 }
 
                                 None => {
-                                    return Err(TaskError::OverflowError(self.vm_state.pc));
+                                    return Err((TaskError::OverflowError(self.vm_state.pc), ran));
                                 }
                             }
                         }
@@ -414,7 +418,7 @@ impl Task {
                                 self.vm_state.lo = (s.wrapping_div(t)) as u32;
                                 self.vm_state.hi = (s.wrapping_rem(t)) as u32;
                             } else {
-                                return Err(TaskError::DivByZeroError(self.vm_state.pc));
+                                return Err((TaskError::DivByZeroError(self.vm_state.pc), ran));
                             }
                         }
                         0b011011 => {
@@ -425,7 +429,7 @@ impl Task {
                                 self.vm_state.lo = s.wrapping_div(t);
                                 self.vm_state.hi = s.wrapping_rem(t);
                             } else {
-                                return Err(TaskError::DivByZeroError(self.vm_state.pc));
+                                return Err((TaskError::DivByZeroError(self.vm_state.pc), ran));
                             }
                         }
                         0b011000 => {
@@ -503,7 +507,7 @@ impl Task {
                             {
                                 self.vm_state.reg[register_d!(op)] = val as u32;
                             } else {
-                                return Err(TaskError::OverflowError(self.vm_state.pc));
+                                return Err((TaskError::OverflowError(self.vm_state.pc), ran));
                             }
                         }
                         0b100011 => {
@@ -633,7 +637,7 @@ impl Task {
                             }
                         }
 
-                        _ => return Err(TaskError::InvalidOperation(self.vm_state.pc, op)),
+                        _ => return Err((TaskError::InvalidOperation(self.vm_state.pc, op), ran)),
                     }
                 }
                 //Jump instructions
@@ -658,7 +662,7 @@ impl Task {
                     {
                         self.vm_state.reg[immediate_t!(op)] = val as u32;
                     } else {
-                        return Err(TaskError::OverflowError(self.vm_state.pc));
+                        return Err((TaskError::OverflowError(self.vm_state.pc), ran));
                     }
                 }
                 0b001001 => {
@@ -748,7 +752,7 @@ impl Task {
                                 self.vm_state.pc += 4;
                             }
                         }
-                        _ => return Err(TaskError::InvalidOperation(self.vm_state.pc, op)),
+                        _ => return Err((TaskError::InvalidOperation(self.vm_state.pc, op), ran)),
                     }
                 }
                 0b000111 => {
@@ -864,7 +868,7 @@ impl Task {
                             get_mem_alligned!(address, i16) as u32;
                     //self.mem.get_i16_alligned(address) as u32
                     } else {
-                        return Err(TaskError::MemoryAllignmentError(2, self.vm_state.pc));
+                        return Err((TaskError::MemoryAllignmentError(2, self.vm_state.pc), ran));
                     }
                 }
                 0b100101 => {
@@ -878,7 +882,7 @@ impl Task {
                             get_mem_alligned!(address, u16) as u32;
                     //self.mem.get_u16_alligned(address) as u32
                     } else {
-                        return Err(TaskError::MemoryAllignmentError(2, self.vm_state.pc));
+                        return Err((TaskError::MemoryAllignmentError(2, self.vm_state.pc), ran));
                     }
                 }
                 0b100011 => {
@@ -891,7 +895,7 @@ impl Task {
                         self.vm_state.reg[immediate_t!(op)] = get_mem_alligned!(address, u32);
                     //self.mem.get_u32_alligned(address) as u32
                     } else {
-                        return Err(TaskError::MemoryAllignmentError(4, self.vm_state.pc));
+                        return Err((TaskError::MemoryAllignmentError(4, self.vm_state.pc), ran));
                     }
                 }
 
@@ -906,7 +910,7 @@ impl Task {
                         self.vm_state.reg[immediate_t!(op)] = get_mem_alligned!(address, u32);
                     //self.mem.get_u32_alligned(address) as u32
                     } else {
-                        return Err(TaskError::MemoryAllignmentError(4, self.vm_state.pc));
+                        return Err((TaskError::MemoryAllignmentError(4, self.vm_state.pc), ran));
                     }
                 }
                 0b111000 => {
@@ -925,7 +929,7 @@ impl Task {
                         *mem.ll_bit = false;
                     } else {
                         self.vm_state.reg[immediate_t!(op)] = 0;
-                        return Err(TaskError::MemoryAllignmentError(4, self.vm_state.pc));
+                        return Err((TaskError::MemoryAllignmentError(4, self.vm_state.pc), ran));
                     }
                 }
 
@@ -949,7 +953,7 @@ impl Task {
                         *mem.ll_bit = false;
                         set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)] as u16, u16);
                     } else {
-                        return Err(TaskError::MemoryAllignmentError(2, self.vm_state.pc));
+                        return Err((TaskError::MemoryAllignmentError(2, self.vm_state.pc), ran));
                     }
                 }
                 0b101011 => {
@@ -961,11 +965,11 @@ impl Task {
                         *mem.ll_bit = false;
                         set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)], u32);
                     } else {
-                        return Err(TaskError::MemoryAllignmentError(4, self.vm_state.pc));
+                        return Err((TaskError::MemoryAllignmentError(4, self.vm_state.pc), ran));
                     }
                 }
 
-                _ => return Err(TaskError::InvalidOperation(self.vm_state.pc, op)),
+                _ => return Err((TaskError::InvalidOperation(self.vm_state.pc, op), ran)),
             }
         }
         Ok(TaskRunResult::Continue)

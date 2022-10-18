@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::{io::Read, time::Instant};
 
 use vm_core::system::System;
 
@@ -36,6 +36,8 @@ fn main() {
         }
     }
 
-    system.run();
-    println!("All tasks terminated, shutting down");
+    let start = Instant::now();
+    let iters = system.run_blocking();
+    let dur = start.elapsed();
+    println!("All tasks terminated, ran vm for {} iterations in {:?}\nshutting down", iters, dur);
 }

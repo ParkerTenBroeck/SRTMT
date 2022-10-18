@@ -7,6 +7,3 @@ edition = "2021"
 
 [dependencies]
 tracing = "0.1"
-
-[profile.release]
-debug = true

@@ -369,8 +369,11 @@ impl Task {
 
                             return Err((TaskError::InvalidOperation(self.vm_state.pc, op), ran))
                         }
-                        crate::system::InterfaceCallResult::Wait => {
+                        crate::system::InterfaceCallResult::WaitRepeated => {
                             self.vm_state.pc -= 4; //we need to re-run this system call when we try again
+                            return Ok(TaskRunResult::Wait(ran))
+                        },
+                        crate::system::InterfaceCallResult::Wait => {
                             return Ok(TaskRunResult::Wait(ran))
                         },
                     }

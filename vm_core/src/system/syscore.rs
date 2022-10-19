@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{Duration, SystemTime},
+};
 
 use crate::{
     scheduler::Scheduler,
@@ -81,9 +84,17 @@ impl SystemCore {
                     tracing::info!("Task: {} -> ", task.pid());
                 }
             }
+            60 => {
+                let time = crate::systime_now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap();
+                let dur = time.as_nanos() as u64;
+                task.vm_state.reg[2] = dur as u32;
+                task.vm_state.reg[3] = (dur >> 32) as u32;
+            }
             100 => {
                 if self.create_new_task.is_some() {
-                    return InterfaceCallResult::Wait;
+                    return InterfaceCallResult::WaitRepeated;
                 }
                 let tcs = TaskCreationInfo {
                     start_addr: task.vm_state.reg[4],
@@ -93,6 +104,16 @@ impl SystemCore {
                 };
                 task.vm_state.reg[2] = tcs.new_id.into_raw();
                 self.create_new_task = Some(tcs);
+            }
+            101 => {
+                let val = task.vm_state.reg[4] as u64 | ((task.vm_state.reg[5] as u64) << 32);
+                let dur = Duration::from_nanos(val);
+                self.scheduler.current_task_sleep(dur);
+
+                return InterfaceCallResult::Wait;
+            }
+            102 => {
+                return InterfaceCallResult::Wait;
             }
             _ => return InterfaceCallResult::InvalidCall(id),
         }
@@ -123,6 +144,7 @@ pub enum InterfaceCallResult {
     ImmediateKill(Option<TaskError>),
     MalformedCallArgs,
     InvalidCall(u32),
+    WaitRepeated,
     Wait,
     Exit,
 }

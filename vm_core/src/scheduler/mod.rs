@@ -16,6 +16,8 @@ pub struct Scheduler {
     average_total_duration: RollingAverage,
     current_time: Option<SystemTime>,
 
+    current_scheduled_task: Option<SchedulerTask>,
+
     total_iterations: u64,
 }
 
@@ -109,18 +111,23 @@ impl Scheduler {
             }
         }
 
-        let task = self.task_list.peek_mut()?;
+        self.current_scheduled_task = self.task_list.pop();
 
-        if task.time_available_to_run().gt(&now) {
-            let dur = task.time_available_to_run().duration_since(now).unwrap();
-            crate::wait_for(dur);
-            self.current_time = Some(crate::systime_now());
+        if let Some(task) = &mut self.current_scheduled_task {
+            if task.time_available_to_run().gt(&now) {
+                let dur = task.time_available_to_run().duration_since(now).unwrap();
+                crate::wait_for(dur);
+                task.sleep_for = None;
+                self.current_time = Some(crate::systime_now());
+            }
+
+            let iterations = (self.average_instructions.average() * 200000)
+                .checked_div(self.average_vm_duration.average())
+                .unwrap_or(500);
+            Some((task.pid, iterations as u32))
+        } else {
+            None
         }
-
-        let iterations = (self.average_instructions.average() * 200000)
-            .checked_div(self.average_vm_duration.average())
-            .unwrap_or(500);
-        Some((task.pid, iterations as u32))
     }
 
     pub fn scheduled_task_report(
@@ -135,17 +142,16 @@ impl Scheduler {
         self.average_vm_duration.roll(duration as i128);
         self.total_iterations += iterations as u64;
 
-        if !self.tasks_to_remove.contains(&pid) {
-            let mut task = self.task_list.pop().unwrap();
-
-            task.last_ran = start;
-
-            self.task_list.push(task);
+        if let Some(mut task) = self.current_scheduled_task.take() {
+            if !self.tasks_to_remove.contains(&pid) {
+                task.last_ran = start;
+                self.task_list.push(task);
+            }
         }
     }
 
-    pub fn has_task(&mut self) -> bool {
-        !self.task_list.is_empty()
+    pub fn current_task_sleep(&mut self, dur: Duration) {
+        self.current_scheduled_task.as_mut().unwrap().sleep_for = Some(dur);
     }
 }
 

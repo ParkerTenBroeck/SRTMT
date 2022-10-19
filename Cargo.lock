@@ -64,6 +64,9 @@ dependencies = [
 [[package]]
 name = "mlib"
 version = "0.1.0"
+dependencies = [
+ "spin",
+]
 
 [[package]]
 name = "mshell"
@@ -71,7 +74,6 @@ version = "0.1.0"
 dependencies = [
  "emballoc",
  "mlib",
- "spin",
 ]
 
 [[package]]

@@ -33,7 +33,7 @@ where
     }
     return res;
 
-    extern "C" fn run_thread(main: *mut core::ffi::c_void) {
+    extern "C" fn run_thread(main: *mut core::ffi::c_void) -> ! {
         unsafe {
             Box::from_raw(main as *mut Box<dyn FnOnce() + Send>)();
         }
@@ -42,14 +42,9 @@ where
 }
 
 pub unsafe fn create_thread(
-    main: extern "C" fn(*mut core::ffi::c_void),
+    main: extern "C" fn(*mut core::ffi::c_void) -> !,
     args: *mut core::ffi::c_void,
 ) -> Result<ThreadJoinHandle, ()> {
-    crate::println!(
-        "creator -> main: {:010X}, args: {:010X}",
-        main as u32,
-        args as u32
-    );
     let res = crate::arch::syscall_ss_s::<START_NEW_THREAD>(main as u32, args as u32);
     if let Some(id) = NonZeroU32::new(res) {
         Ok(ThreadJoinHandle { id })

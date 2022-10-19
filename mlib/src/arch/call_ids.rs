@@ -32,8 +32,8 @@ pub const SLEEP_D_MS: u32 = 51;
 
 /// Current time nanos
 ///
-/// Register 2: upper half of nanos
-/// Register 3: lower half of nanos
+/// Register 2: lower half of nanos
+/// Register 3: upper half of nanos
 pub const CURRENT_TIME_NANOS: u32 = 60;
 
 /// Generate a random number between xi32 and yi32
@@ -56,3 +56,6 @@ pub const START_NEW_THREAD: u32 = 100;
 ///
 /// Register 4/5: number of nano seconds to sleep for
 pub const SLEEP_NANOS: u32 = 101;
+
+/// Basically stop exicuting until the scheduler decides this task should run next
+pub const WAIT_CONTINUE: u32 = 102;

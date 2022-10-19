@@ -10,8 +10,6 @@ edition = "2021"
 
 [dependencies]
 mlib = { path = "../mlib", features = ["alloc"]}
-spin = "*"
-
 
 [dependencies.emballoc]
-version = "*"
+version = "0.1.2"

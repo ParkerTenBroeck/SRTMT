@@ -1,11 +1,21 @@
 #![no_std]
 #![no_main]
 
+use core::time::Duration;
+
 use mlib::*;
 
 #[no_mangle]
 fn main() {
-    for i in 0..50_000u32 {
+    for i in 0..30 {
+        let start = mlib::time::system_time_nanos();
+        mlib::thread::sleep(Duration::from_millis(100));
+        let end = mlib::time::system_time_nanos();
+        println!("{i}: {:?}", Duration::from_nanos(end - start));
+    }
+    //mlib::process::exit(0);
+
+    for i in 0..50u32 {
         if is_prime(i) {
             println!("{i} is prime");
         }

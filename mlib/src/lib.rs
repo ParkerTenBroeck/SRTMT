@@ -26,9 +26,12 @@ pub mod io;
 pub mod process;
 pub mod sync;
 pub mod thread;
+pub mod time;
 
 mod marcos;
 pub use marcos::*;
+
+
 
 #[no_mangle]
 #[naked]

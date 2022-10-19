@@ -2,10 +2,50 @@
 #![no_main]
 #![feature(default_alloc_error_handler)]
 
+use core::time::Duration;
+
 use mlib::*;
+use spin::RelaxStrategy;
 
 #[no_mangle]
 fn main() {
+
+    for i in 0..100 {
+        // unsafe {
+        //     mlib::thread::create_thread(start, core::ptr::null_mut());
+        // }
+        // extern "C" fn start(_args: *mut core::ffi::c_void) -> ! {
+        //     let tstart = mlib::time::system_time_nanos();
+        //     for b in 0..3 {
+        //         let start = mlib::time::system_time_nanos();
+        //         mlib::thread::sleep(Duration::from_millis(1000));
+        //         let end = mlib::time::system_time_nanos();
+        //         println!(
+        //             "{b} {:?}, {:?}",
+        //             Duration::from_nanos(end - tstart),
+        //             Duration::from_nanos(end - start)
+        //         );
+        //     }
+        //     mlib::process::exit(0);
+        // }
+        let _ = mlib::thread::start_new_thread(move || {
+            let tstart = mlib::time::system_time_nanos();
+            for b in 0..3 {
+                let start = mlib::time::system_time_nanos();
+                mlib::thread::sleep(Duration::from_millis(1000));
+                let end = mlib::time::system_time_nanos();
+                println!(
+                    "{i}:{b} {:?}, {:?}",
+                    Duration::from_nanos(end - tstart),
+                    Duration::from_nanos(end - start)
+                );
+            }
+        });
+    }
+    if true{
+        mlib::process::exit(0);
+    }
+
     let number = 23;
     let handle = mlib::thread::start_new_thread(move || {
         for i in 0..number {

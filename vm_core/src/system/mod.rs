@@ -56,6 +56,7 @@ impl System {
         self.core.scheduler.total_iterations()
     }
 
+    #[inline(always)]
     fn post_task_stuff(&mut self) {
         if let Some(new_task_info) = self.core.create_new_task.take() {
             let mut new_task = Task::new(new_task_info.new_id);
@@ -156,12 +157,7 @@ impl System {
         SystemTime,
         SystemTime,
     ) {
-        let task = self
-            .tasks
-            .task_pool
-            .iter_mut()
-            .find(|t| t.pid() == pid)
-            .unwrap();
+        let task = self.tasks.task_pool.get_mut(&pid).unwrap();
 
         // this is sketchy but we know that we un-set this later in the function before we return
         // so we can (hopfully) do this even if its kinda really bad
@@ -204,7 +200,7 @@ impl System {
 
     pub fn remove_page(&mut self, to_remove_page_id: usize) {
         self.tasks.sys_mem.v_mem.remove(to_remove_page_id);
-        for task in &mut self.tasks.task_pool {
+        for task in &mut self.tasks.task_pool.values_mut() {
             for (page_id, _) in &mut task.memory_mapping.mapping {
                 if *page_id >= to_remove_page_id {
                     *page_id -= 1;

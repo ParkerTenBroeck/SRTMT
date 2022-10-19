@@ -1,7 +1,7 @@
-use std::fmt::Display;
+use std::{fmt::Display, num::NonZeroU32};
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ProcessId(u32);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ProcessId(NonZeroU32);
 
 impl Display for ProcessId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -9,12 +9,16 @@ impl Display for ProcessId {
     }
 }
 impl ProcessId {
+    pub fn new(id: u32) -> Option<Self> {
+        Some(Self(NonZeroU32::new(id)?))
+    }
+
     pub fn from_raw(id: u32) -> Self {
-        Self(id)
+        Self(NonZeroU32::new(id).unwrap())
     }
 
     pub fn into_raw(&self) -> u32 {
-        self.0
+        self.0.get()
     }
 }
 

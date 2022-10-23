@@ -16,7 +16,7 @@
             },
             "args": [
                 "-B",
-                "${workspaceFolder}/target/mips/release/mshell.bin,${workspaceFolder}/target/mips/release/mtest.bin"
+                "${workspaceFolder}/target/mips/release/shell.bin,${workspaceFolder}/target/mips/release/test_prog.bin"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -33,7 +33,7 @@
             },
             "args": [
                 "-B",
-                "${workspaceFolder}/target/mips/release/mshell.bin,${workspaceFolder}/target/mips/release/mtest.bin"
+                "${workspaceFolder}/target/mips/release/shell.bin,${workspaceFolder}/target/mips/release/test_prog.bin"
             ],
             "cwd": "${workspaceFolder}"
         },

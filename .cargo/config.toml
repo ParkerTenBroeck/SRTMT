@@ -1,5 +1,5 @@
 
 
 [alias]
-build_all = "run --package build_tools -- -B mshell,mtest"
-run_vm = "run --package build_tools -- run -B mshell,mtest"
+build_all = "run --package build_tools -- -B shell,test_prog"
+run_vm = "run --package build_tools -- run -B shell,test_prog"

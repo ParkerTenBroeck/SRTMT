@@ -230,6 +230,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "core"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -878,28 +885,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mlib"
-version = "0.1.0"
-dependencies = [
- "spin",
-]
-
-[[package]]
-name = "mshell"
-version = "0.1.0"
-dependencies = [
- "emballoc",
- "mlib",
-]
-
-[[package]]
-name = "mtest"
-version = "0.1.0"
-dependencies = [
- "mlib",
-]
-
-[[package]]
 name = "ndk"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1235,6 +1220,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rlib"
+version = "0.1.0"
+dependencies = [
+ "spin",
+]
+
+[[package]]
 name = "safe_arch"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1334,6 +1326,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "shell"
+version = "0.1.0"
+dependencies = [
+ "emballoc",
+ "rlib",
+]
+
+[[package]]
 name = "slotmap"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1390,10 +1390,10 @@ dependencies = [
 name = "srtmt"
 version = "0.1.0"
 dependencies = [
+ "core",
  "eframe",
  "tracing",
  "tracing-subscriber",
- "vm_core",
 ]
 
 [[package]]
@@ -1417,6 +1417,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "test_prog"
+version = "0.1.0"
+dependencies = [
+ "rlib",
 ]
 
 [[package]]
@@ -1610,13 +1617,6 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
-
-[[package]]
-name = "vm_core"
-version = "0.1.0"
-dependencies = [
- "tracing",
-]
 
 [[package]]
 name = "walkdir"

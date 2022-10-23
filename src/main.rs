@@ -1,6 +1,6 @@
 use std::{io::Read, time::Instant, pin::Pin, ops::DerefMut};
 
-use vm_core::system::System;
+use core::system::System;
 
 fn main() {
     tracing_subscriber::fmt::init();

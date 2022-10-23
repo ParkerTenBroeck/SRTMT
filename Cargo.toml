@@ -1,10 +1,10 @@
 [workspace]
 members = [
     "build_tools",
-    "mlib",
-    "mtest",
-    "mshell",
-    "vm_core",
+    "rt/rlib",
+    "rt/test_prog",
+    "rt/shell",
+    "vm/core",
 ]
 resolver = "2"
 
@@ -19,7 +19,7 @@ description = "A sorta simulation of real time multithreading without actual mul
 [dependencies]
 tracing = "0.1"
 tracing-subscriber = "0.3"
-vm_core = { path = "vm_core" }
+core = { path = "vm/core" }
 eframe = "*"
 
 [profile.release]

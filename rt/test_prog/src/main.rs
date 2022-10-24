@@ -33,11 +33,3 @@ fn is_prime(n: u32) -> bool {
     }
     true // last value to return
 }
-
-#[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
-    println!("PANIC: {:#?}", info);
-    loop {
-        rlib::process::exit(-1)
-    }
-}

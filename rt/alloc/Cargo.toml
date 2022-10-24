@@ -1,13 +1,12 @@
 [package]
-name = "shell"
+name = "rt-alloc"
 version = "0.1.0"
 edition = "2021"
-
-
-
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 rlib = { path = "../rlib", features = ["alloc"]}
-rt-alloc ={ path = "../alloc" }
+
+[dependencies.emballoc]
+version = "0.1.2"

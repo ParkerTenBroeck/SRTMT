@@ -1,10 +1,9 @@
-use std::{io::Read, time::Instant, pin::Pin, ops::DerefMut};
+use std::{io::Read, time::Instant, ops::DerefMut};
 
 use core::system::System;
 
 fn main() {
     tracing_subscriber::fmt::init();
-
     let mut args = std::env::args().skip(1).peekable(); // skip executable name
 
     let mut system = System::default();

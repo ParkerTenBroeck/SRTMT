@@ -1,9 +1,12 @@
 [workspace]
 members = [
     "build_tools",
+    
     "rt/rlib",
+    "rt/alloc",
     "rt/test_prog",
     "rt/shell",
+
     "vm/core",
 ]
 resolver = "2"
@@ -24,3 +27,6 @@ eframe = "*"
 
 [profile.release]
 debug = true
+
+[profile.dev]
+opt-level = 2

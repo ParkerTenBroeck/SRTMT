@@ -4,14 +4,15 @@
 
 use core::time::Duration;
 
+
 use rlib::*;
 
 #[no_mangle]
 fn main() {
-
-    for i in 0..100 {
+    
+    for _i in 0..100 {
         unsafe {
-            rlib::thread::create_thread(start, core::ptr::null_mut());
+            _ = rlib::thread::create_thread(start, core::ptr::null_mut());
         }
         extern "C" fn start(_args: *mut core::ffi::c_void) -> ! {
             let tstart = rlib::time::system_time_nanos();
@@ -79,15 +80,7 @@ fn is_prime(n: u32) -> bool {
     true // last value to return
 }
 
-#[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
-    println!("PANIC: {:#?}", info);
-    loop {
-        rlib::process::exit(-1);
-    }
-}
+
 
 #[global_allocator]
-static ALLOCATOR: emballoc::Allocator<4096> = emballoc::Allocator::new();
-
-extern crate alloc;
+static ALLOCATOR: rt_alloc::Allocator<4096> = rt_alloc::Allocator::new();

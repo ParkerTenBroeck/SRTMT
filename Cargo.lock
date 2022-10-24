@@ -1227,6 +1227,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rt-alloc"
+version = "0.1.0"
+dependencies = [
+ "emballoc",
+ "rlib",
+]
+
+[[package]]
 name = "safe_arch"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1329,8 +1337,8 @@ dependencies = [
 name = "shell"
 version = "0.1.0"
 dependencies = [
- "emballoc",
  "rlib",
+ "rt-alloc",
 ]
 
 [[package]]

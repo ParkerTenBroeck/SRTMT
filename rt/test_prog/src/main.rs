@@ -7,6 +7,9 @@ use rlib::*;
 
 #[no_mangle]
 fn main() {
+    if true{
+        rlib::process::exit(0);
+    }
     for i in 0..30 {
         let start = rlib::time::system_time_nanos();
         rlib::thread::sleep(Duration::from_millis(100));

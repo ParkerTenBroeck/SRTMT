@@ -10,13 +10,13 @@ use rlib::*;
 #[no_mangle]
 fn main() {
     
-    for _i in 0..100 {
+    for _i in 0..500 {
         unsafe {
             _ = rlib::thread::create_thread(start, core::ptr::null_mut());
         }
         extern "C" fn start(_args: *mut core::ffi::c_void) -> ! {
             let tstart = rlib::time::system_time_nanos();
-            for b in 0..3 {
+            for b in 0..10 {
                 let start = rlib::time::system_time_nanos();
                 rlib::thread::sleep(Duration::from_millis(1000));
                 let end = rlib::time::system_time_nanos();

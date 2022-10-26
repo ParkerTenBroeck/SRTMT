@@ -110,18 +110,18 @@ impl Scheduler {
                 break;
             }
         }
-
+        
         self.current_scheduled_task = self.task_list.pop();
 
         if let Some(task) = &mut self.current_scheduled_task {
-            if task.time_available_to_run().gt(&now) {
+            if task.time_available_to_run().ge(&now) {
                 let dur = task.time_available_to_run().duration_since(now).unwrap();
                 crate::wait_for(dur);
-                task.sleep_for = None;
                 self.current_time = Some(crate::systime_now());
             }
+            task.sleep_for = None;
 
-            let iterations = (self.average_instructions.average() * 200000)
+            let iterations = (self.average_instructions.average() * 200_000)
                 .checked_div(self.average_vm_duration.average())
                 .unwrap_or(500);
             Some((task.pid, iterations as u32))
@@ -144,7 +144,7 @@ impl Scheduler {
 
         if let Some(mut task) = self.current_scheduled_task.take() {
             if !self.tasks_to_remove.contains(&pid) {
-                task.last_ran = start;
+                task.last_ran = end;
                 self.task_list.push(task);
             }
         }

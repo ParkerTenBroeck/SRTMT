@@ -5,7 +5,11 @@ use core::system::System;
 fn main() {
     tracing_subscriber::fmt::init();
     let mut args = std::env::args().skip(1).peekable(); // skip executable name
-
+    // let thing = std::sync::Condvar::new();
+    //thing.wait();
+    // std::sys::futex::futex_wait(futex, expected, timeout)
+    // std::thread::park();
+    // std::thread::current().unpark();
     let mut system = System::default();
 
     while let Some(arg) = args.next() {

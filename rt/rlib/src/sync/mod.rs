@@ -13,6 +13,7 @@ impl RelaxStrategy for VmRelax{
     #[inline(always)]
     fn relax() {
         unsafe{
+            
             use crate::arch::WAIT_CONTINUE;
             crate::arch::syscall_v_v::<WAIT_CONTINUE>();
         }

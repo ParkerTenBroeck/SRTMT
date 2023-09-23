@@ -4,12 +4,10 @@
 
 use core::time::Duration;
 
-
 use rlib::*;
 
 #[no_mangle]
 fn main() {
-    
     for _i in 0..500 {
         unsafe {
             _ = rlib::thread::create_thread(start, core::ptr::null_mut());
@@ -29,7 +27,7 @@ fn main() {
             rlib::process::exit(0);
         }
         // let _ = rlib::thread::start_new_thread(move || {
-        //     let tstart = rlib::time::system_time_nanos();
+        //     let tstart = rlib::time::systepm_time_nanos();
         //     for b in 0..3 {
         //         let start = rlib::time::system_time_nanos();
         //         rlib::thread::sleep(Duration::from_millis(1000));
@@ -42,16 +40,16 @@ fn main() {
         //     }
         // });
     }
-    if true{
-        rlib::process::exit(0);
-    }
+    // if true {
+    //     rlib::process::exit(0);
+    // }
 
-    let number = 23;
-    let handle = rlib::thread::start_new_thread(move || {
+    let number = 4;
+    let handle = rlib::thread::spawn(move || {
         for i in 0..number {
             println!("NEW THREAD: {}", i);
-            let _ = rlib::thread::start_new_thread(move || {
-                for i in 0..5_000u32 {
+            let _ = rlib::thread::spawn(move || {
+                for i in 0..50_000u32 {
                     if is_prime(i) {
                         println!("{i} is prime");
                     }
@@ -79,8 +77,6 @@ fn is_prime(n: u32) -> bool {
     }
     true // last value to return
 }
-
-
 
 #[global_allocator]
 static ALLOCATOR: rt_alloc::Allocator<4096> = rt_alloc::Allocator::new();

@@ -59,3 +59,19 @@ pub const SLEEP_NANOS: u32 = 101;
 
 /// Basically stop exicuting until the scheduler decides this task should run next
 pub const WAIT_CONTINUE: u32 = 102;
+
+/// Wake n tasks for the futex
+///
+/// Register 4: Pointer to the futex
+/// Register 5: Number of tasks to wake
+///
+/// Register 2: Number of tasks actually woken
+pub const FUTEX_WAKE: u32 = 200;
+
+/// Sleep on the futex condition
+///
+/// Register 4: Pointer to the futex
+/// Register 5: The condition the futex must be in to wait
+///
+/// Register 2: 1 if the condition was met, 0 otherwise
+pub const FUTEX_WAIT: u32 = 201;

@@ -37,6 +37,7 @@ SECTIONS
         *(.data*)   
     }
 
+    _bss_start = .;
     .bss : 
     {
         . = ALIGN(0x8);
@@ -44,6 +45,8 @@ SECTIONS
         . = ALIGN(0x8);
         *(.bss*)   
     }
+    _bss_end = .;
+    _bss_size = _bss_end - _bss_start;
     .rodata : 
     {
         . = ALIGN(0x8);

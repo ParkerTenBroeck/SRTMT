@@ -8,6 +8,7 @@
 #![feature(allow_internal_unstable)]
 #![feature(linkage)]
 #![feature(box_syntax)]
+#![feature(const_black_box)]
 
 #[cfg(not(target_arch = "mips"))]
 compile_error!("ONLY MIPS ARCHITECTURE SUPPORTED");
@@ -16,6 +17,7 @@ compile_error!("NOT LITTLE ENDIAN");
 
 pub mod arch;
 pub mod core_rust;
+pub mod hint;
 pub mod io;
 pub mod process;
 pub mod sync;
@@ -31,6 +33,6 @@ pub use core::*;
 extern crate alloc;
 
 #[cfg(feature = "alloc")]
-pub use alloc::*; 
+pub use alloc::*;
 
 pub mod rt;

@@ -1,54 +1,95 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    sync::{atomic::AtomicBool, Mutex, RwLock},
+};
+
+use rclite::Arc;
 
 use crate::{
-    task::Task,
-    util::{Page, ProcessId},
+    task::{Task, TaskMemory},
+    util::{Page, TaskId},
 };
 
 #[derive(Default)]
 pub struct TaskPool {
-    pub sys_mem: TaskPoolSharedMemory,
-    pub task_pool: HashMap<ProcessId, Task>,
+    pub task_pool: HashMap<TaskId, Arc<Mutex<Task>>>,
 }
 
 impl TaskPool {
-    pub fn get_task(&self, pid: ProcessId) -> &Task {
-        self.task_pool.get(&pid).unwrap()
-    }
-
-    pub fn get_task_mut(&mut self, pid: ProcessId) -> &mut Task {
-        self.task_pool.get_mut(&pid).unwrap()
+    pub fn get_task(&self, task: TaskId) -> Arc<Mutex<Task>> {
+        self.task_pool.get(&task).unwrap().clone()
     }
 
     pub fn add_task(&mut self, task: Task) {
-        self.task_pool.insert(task.pid(), task);
+        self.task_pool
+            .insert(task.tid(), Arc::new(Mutex::new(task)));
     }
 
-    pub fn remove_task(&mut self, pid: ProcessId) {
-        let mut task = self.task_pool.remove(&pid).unwrap();
-        for st in self.task_pool.values_mut() {
-            for (pageid, _v_addr) in &st.memory_mapping.mapping {
-                task.memory_mapping.mapping.retain(|rt| rt.0 == *pageid);
-            }
-        }
-        for (page_id, _) in task.memory_mapping.mapping {
-            self.remote_page(page_id);
-        }
+    pub fn remove_task(&mut self, tid: TaskId) -> Arc<Mutex<Task>> {
+        self.task_pool.remove(&tid).unwrap()
     }
+}
 
-    fn remote_page(&mut self, remove_page_id: usize) {
-        for st in self.task_pool.values_mut() {
-            for (page_id, _v_addr) in &mut st.memory_mapping.mapping {
-                if *page_id >= remove_page_id {
-                    *page_id -= 1;
-                }
-            }
-        }
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub struct PageId(usize);
+impl PageId {
+    pub(crate) fn raw(&self) -> usize {
+        self.0
+    }
+}
+
+impl Display for PageId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PageId({})", self.0)
     }
 }
 
 #[derive(Default)]
 pub struct TaskPoolSharedMemory {
-    pub v_mem: Vec<Page>,
-    pub ll_bit: bool,
+    pub v_mem: RwLock<Vec<(Arc<Page>, PageMetaData)>>,
+    pub ll_bit: AtomicBool,
 }
+
+impl TaskPoolSharedMemory {
+    pub fn new_page(&self) -> Arc<Page> {
+        let mut writter = self.v_mem.write().unwrap();
+        for (page_id, meta) in writter.iter_mut().enumerate() {
+            if meta.0.strong_count() == 1 {
+                meta.0 = Arc::new(Page::new());
+                return meta.0.clone();
+            }
+        }
+        let new = Arc::new(Page::new());
+        writter.push((new.clone(), PageMetaData {}));
+        new
+    }
+
+    pub fn task_with_mapping<R, F>(
+        &self,
+        task: &mut Task,
+        mem: &mut TaskMemory<'_, '_>,
+        scope: F,
+    ) -> R
+    where
+        F: for<'f> FnOnce(&mut Task, &mut TaskMemory<'_, 'f>) -> R,
+    {
+        for (page_id, v_addr) in &task.memory_mapping.mapping {
+            //extend the lifetime
+            let page = unsafe { std::mem::transmute::<&Page, &Page>(&**page_id) };
+            mem.mem[*v_addr as usize] = Some(page);
+        }
+
+        let res = scope(task, mem);
+
+        // make sure that after extending the lifetime we MUST remove all the references we placed into here ( or things break badly :) )
+        for (_, v_addr) in &task.memory_mapping.mapping {
+            mem.mem[*v_addr as usize] = None;
+        }
+
+        res
+        // todo!();
+    }
+}
+
+pub struct PageMetaData {}

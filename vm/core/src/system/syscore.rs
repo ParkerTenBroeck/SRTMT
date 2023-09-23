@@ -4,45 +4,40 @@ use std::{
 };
 
 use crate::{
-    scheduler::Scheduler,
+    scheduler::{Scheduler, SchedulerTask},
     task::{Task, TaskError, TaskMemory},
-    util::ProcessId,
+    util::TaskId,
 };
+
+use super::System;
 
 #[derive(Default)]
 pub struct SystemCore {
-    pub(super) partial_process_output: HashMap<ProcessId, String>,
-    pub(super) create_new_task: Option<TaskCreationInfo>,
+    pub(super) partial_process_output: HashMap<TaskId, String>,
     pub(super) next_task_id: u32,
     pub(super) scheduler: Scheduler,
 }
 
-pub struct TaskCreationInfo {
-    pub(super) start_addr: u32,
-    pub(super) argument_ptr: u32,
-    pub(super) new_id: ProcessId,
-    pub(super) creator_id: ProcessId,
-}
-
-impl SystemCore {
+impl System {
     pub fn system_call(
         &mut self,
         id: u32,
         task: &mut Task,
-        mem: &mut TaskMemory<'_>,
+        scheduler_task: &mut SchedulerTask,
+        mem: &mut TaskMemory<'_, '_>,
     ) -> InterfaceCallResult {
         match id {
             0 => return InterfaceCallResult::Exit,
             1 => {
-                tracing::info!("Task: {} -> {}", task.pid(), task.vm_state.reg[4] as i32);
+                tracing::info!("Task: {} -> {}", task.tid(), task.vm_state.reg[4] as i32);
             }
             4 => {
                 let mut address = task.vm_state.reg[4];
                 let mut str: Vec<u8> = Vec::new();
                 loop {
-                    match mem.mem.get_mut(address as usize >> 16).unwrap() {
+                    match mem.mem.get(address as usize >> 16).unwrap() {
                         Some(page) => {
-                            let char = page[address as u16 as usize];
+                            let char = page.get_u8(address as u16);
                             if char == 0 {
                                 break;
                             }
@@ -59,7 +54,7 @@ impl SystemCore {
 
                 let str = String::from_utf8(str);
                 if let Ok(str) = str {
-                    tracing::info!("Task: {} -> {}", task.pid(), str);
+                    tracing::info!("Task: {} -> {}", task.tid(), str);
                 } else {
                     return InterfaceCallResult::MalformedCallArgs;
                 }
@@ -69,19 +64,20 @@ impl SystemCore {
                 let char = task.vm_state.reg[4] as u8 as char;
                 if char != '\n' {
                     if let std::collections::hash_map::Entry::Vacant(e) =
-                        self.partial_process_output.entry(task.pid())
+                        self.core.partial_process_output.entry(task.tid())
                     {
                         e.insert(char.into());
                     } else {
-                        self.partial_process_output
-                            .get_mut(&task.pid())
+                        self.core
+                            .partial_process_output
+                            .get_mut(&task.tid())
                             .unwrap()
                             .push(char);
                     }
-                } else if let Some(msg) = self.partial_process_output.remove(&task.pid()) {
-                    tracing::info!("Task: {} -> {}", task.pid(), msg);
+                } else if let Some(msg) = self.core.partial_process_output.remove(&task.tid()) {
+                    tracing::info!("Task: {} -> {}", task.tid(), msg);
                 } else {
-                    tracing::info!("Task: {} -> ", task.pid());
+                    tracing::info!("Task: {} -> ", task.tid());
                 }
             }
             60 => {
@@ -93,43 +89,70 @@ impl SystemCore {
                 task.vm_state.reg[3] = (dur >> 32) as u32;
             }
             100 => {
-                if self.create_new_task.is_some() {
-                    return InterfaceCallResult::WaitRepeated;
-                }
-                let tcs = TaskCreationInfo {
-                    start_addr: task.vm_state.reg[4],
-                    argument_ptr: task.vm_state.reg[5],
-                    new_id: self.next_task_id(),
-                    creator_id: task.pid(),
-                };
-                task.vm_state.reg[2] = tcs.new_id.into_raw();
-                self.create_new_task = Some(tcs);
+                let mut new_task = Task::new_subthread(task.thread_id().1, self.next_task_id());
+
+                let shared_core_and_data = task.memory_mapping.mapping.first().unwrap().clone();
+
+                new_task.memory_mapping.mapping.push(shared_core_and_data);
+
+                // tasks default stack
+                new_task
+                    .memory_mapping
+                    .mapping
+                    .push((self.sys_mem.new_page(), 0x7FFF));
+
+                new_task.vm_state.pc = task.vm_state.reg[4];
+                new_task.vm_state.reg[4] = task.vm_state.reg[5];
+                new_task.vm_state.reg[29] = 0x80000000; //start of stack
+                new_task.vm_state.reg[31] = 0xFFFFFFFF;
+
+                tracing::info!(
+                    "Created new task: {}\nDUMP{{:?}}",
+                    new_task.tid(),
+                    //new_task
+                );
+                task.vm_state.reg[2] = new_task.tid().into_raw();
+                self.add_task(new_task);
             }
             101 => {
                 let val = task.vm_state.reg[4] as u64 | ((task.vm_state.reg[5] as u64) << 32);
                 let dur = Duration::from_nanos(val);
-                self.scheduler.current_task_sleep(dur);
-
+                scheduler_task.sleep_for = Some(dur);
+                //23479387.80014355
+                //248832255.48680574
+                //233960039
                 return InterfaceCallResult::Wait;
             }
             102 => {
+                // stop doing tings and stuff and
                 return InterfaceCallResult::Wait;
+            }
+            // Futex wake
+            200 => {
+                let futex_addr = task.vm_state.reg[4];
+                let tasks_to_wake = task.vm_state.reg[5];
+            }
+            // Futex wait
+            201 => {
+                let futex_addr = task.vm_state.reg[4];
+                let condition = task.vm_state.reg[5];
             }
             _ => return InterfaceCallResult::InvalidCall(id),
         }
         InterfaceCallResult::Continue
     }
 
-    pub fn next_task_id(&mut self) -> ProcessId {
-        self.next_task_id += 1;
-        ProcessId::from_raw(self.next_task_id)
+    pub fn next_task_id(&mut self) -> TaskId {
+        self.core.next_task_id += 1;
+        TaskId::from_raw(self.core.next_task_id)
     }
 
     pub fn breakpoint(
         &mut self,
         id: u32,
         _task: &mut Task,
-        _mem: &mut TaskMemory<'_>,
+        _scheduler_task: &mut SchedulerTask,
+        _mem: &TaskMemory<'_, '_>,
     ) -> InterfaceCallResult {
         match id {
             534 => {}

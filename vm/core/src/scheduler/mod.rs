@@ -1,6 +1,6 @@
 use std::{collections::BinaryHeap, time::Duration};
 
-use crate::util::ProcessId;
+use crate::util::{TaskId, ThreadId};
 use crate::SystemTime;
 
 /// The Scheduler to schedule what task will run and for how long
@@ -9,23 +9,28 @@ use crate::SystemTime;
 #[derive(Default)]
 pub struct Scheduler {
     task_list: BinaryHeap<SchedulerTask>,
-    tasks_to_remove: Vec<ProcessId>,
+    tasks_to_remove: Vec<TaskId>,
 
     average_instructions: RollingAverage,
     average_vm_duration: RollingAverage,
     average_total_duration: RollingAverage,
     current_time: Option<SystemTime>,
 
-    current_scheduled_task: Option<SchedulerTask>,
-
+    // current_scheduled_task: Option<SchedulerTask>,
     total_iterations: u64,
 }
 
 #[derive(Debug)]
 pub struct SchedulerTask {
-    pid: ProcessId,
+    task: ThreadId,
     last_ran: SystemTime,
-    sleep_for: Option<Duration>,
+    pub sleep_for: Option<Duration>,
+}
+
+impl SchedulerTask {
+    pub fn tid(&self) -> ThreadId {
+        self.task
+    }
 }
 
 impl SchedulerTask {
@@ -68,9 +73,9 @@ impl PartialEq for SchedulerTask {
 }
 
 impl SchedulerTask {
-    pub fn new(pid: ProcessId) -> Self {
+    pub fn new(task: ThreadId) -> Self {
         SchedulerTask {
-            pid,
+            task,
             last_ran: SystemTime::UNIX_EPOCH,
             sleep_for: None,
         }
@@ -78,7 +83,7 @@ impl SchedulerTask {
 }
 
 impl Scheduler {
-    pub fn add_task(&mut self, pid: ProcessId) {
+    pub fn add_task(&mut self, pid: ThreadId) {
         self.task_list.push(SchedulerTask::new(pid));
     }
 
@@ -86,11 +91,13 @@ impl Scheduler {
         self.total_iterations
     }
 
-    pub fn remove_task(&mut self, pid: ProcessId) {
-        self.tasks_to_remove.push(pid);
+    pub fn remove_task(&mut self, tid: TaskId) {
+        // self.task_list.retain(|task|{});
+        // todo!()
+        self.tasks_to_remove.push(tid);
     }
 
-    pub fn schedule_next_task(&mut self) -> Option<(ProcessId, u32)> {
+    pub fn schedule_next_task(&mut self) -> Option<(SchedulerTask, u32)> {
         let now = crate::systime_now();
         if let Some(last_time) = self.current_time {
             let dur = now.duration_since(last_time).unwrap().as_nanos();
@@ -98,22 +105,11 @@ impl Scheduler {
         }
         self.current_time = Some(now);
 
-        while !self.task_list.is_empty() {
-            if self
-                .tasks_to_remove
-                .contains(&self.task_list.peek_mut().unwrap().pid)
-            {
-                let pid = self.task_list.pop().unwrap().pid;
-                self.tasks_to_remove
-                    .remove(self.tasks_to_remove.iter().position(|t| *t == pid).unwrap());
-            } else {
-                break;
+        while let Some(mut task) = self.task_list.pop() {
+            if self.tasks_to_remove.contains(&task.tid().0) {
+                self.tasks_to_remove.retain(|t| *t != task.tid().0);
+                continue;
             }
-        }
-        
-        self.current_scheduled_task = self.task_list.pop();
-
-        if let Some(task) = &mut self.current_scheduled_task {
             if task.time_available_to_run().ge(&now) {
                 let dur = task.time_available_to_run().duration_since(now).unwrap();
                 crate::wait_for(dur);
@@ -124,15 +120,14 @@ impl Scheduler {
             let iterations = (self.average_instructions.average() * 200_000)
                 .checked_div(self.average_vm_duration.average())
                 .unwrap_or(500);
-            Some((task.pid, iterations as u32))
-        } else {
-            None
+            return Some((task, iterations as u32));
         }
+        None
     }
 
     pub fn scheduled_task_report(
         &mut self,
-        pid: ProcessId,
+        task: Option<SchedulerTask>,
         iterations: u32,
         start: SystemTime,
         end: SystemTime,
@@ -141,17 +136,10 @@ impl Scheduler {
         self.average_instructions.roll(iterations as i128);
         self.average_vm_duration.roll(duration as i128);
         self.total_iterations += iterations as u64;
-
-        if let Some(mut task) = self.current_scheduled_task.take() {
-            if !self.tasks_to_remove.contains(&pid) {
-                task.last_ran = end;
-                self.task_list.push(task);
-            }
+        if let Some(mut task) = task {
+            task.last_ran = end;
+            self.task_list.push(task);
         }
-    }
-
-    pub fn current_task_sleep(&mut self, dur: Duration) {
-        self.current_scheduled_task.as_mut().unwrap().sleep_for = Some(dur);
     }
 }
 

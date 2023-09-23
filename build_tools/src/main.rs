@@ -6,6 +6,7 @@ fn main() {
     let mut raw_binaries = Vec::new();
     let mut run_vm = false;
     let mut release = false;
+    let mut use_miri = false;
     let mut unreconized = Vec::new();
 
     while let Some(string) = args.next() {
@@ -13,6 +14,7 @@ fn main() {
             "run" => {
                 run_vm = true;
             }
+            "-M" => use_miri = true,
             "-B" => {
                 if let Some(next) = args.peek() {
                     if next.starts_with('-') {
@@ -41,6 +43,15 @@ fn main() {
         let mut run_cmd = Command::new("cargo");
         run_cmd.current_dir(std::env::current_dir().unwrap());
 
+        if use_miri {
+            run_cmd.arg("+nightly");
+            run_cmd.arg("miri");
+            run_cmd.env(
+                "MIRIFLAGS",
+                "-Zmiri-disable-isolation -Zmiri-disable-stacked-borrows",
+            );
+        }
+
         let mut str = String::new();
         for p in raw_binaries {
             if !str.is_empty() {
@@ -48,7 +59,13 @@ fn main() {
             }
             str.push_str(p.to_str().unwrap())
         }
+
         run_cmd.arg("run");
+
+        // if use_miri{
+        //     run_cmd.args(["--", "-Z", "miri-isolation-error=warn"]);
+        // }
+
         if release {
             run_cmd.arg("--release");
         }

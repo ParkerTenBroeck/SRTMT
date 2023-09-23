@@ -9,7 +9,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 
 #[cfg(feature = "alloc")]
-pub fn start_new_thread<F, T>(f: F) -> Result<ThreadJoinHandle, ()>
+pub fn spawn<F, T>(f: F) -> Result<ThreadJoinHandle, ()>
 where
     F: FnOnce() -> T,
     F: Send + 'static,

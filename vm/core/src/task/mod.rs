@@ -1,12 +1,17 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::atomic::AtomicBool};
+
+use rclite::Arc;
 
 use crate::{
-    system::SystemCore,
-    util::{Page, PageId, ProcessId},
+    scheduler::{self, SchedulerTask},
+    system::System,
+    taskpool::PageId,
+    util::{Page, ProcessId, TaskId},
 };
 
 #[derive(Debug)]
 pub struct Task {
+    task_id: TaskId,
     pid: ProcessId,
     pub name: Option<String>,
     pub vm_state: VmState,
@@ -14,17 +19,26 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(id: ProcessId) -> Self {
+    pub fn new_mainthread(tid: TaskId) -> Self {
+        Self::new_subthread(tid.to_pid(), tid)
+    }
+
+    pub fn tid(&self) -> TaskId {
+        self.task_id
+    }
+
+    pub fn new_subthread(pid: ProcessId, tid: TaskId) -> Self {
         Self {
-            pid: id,
+            task_id: tid,
+            pid,
             vm_state: Default::default(),
             memory_mapping: Default::default(),
             name: None,
         }
     }
 
-    pub fn pid(&self) -> ProcessId {
-        self.pid
+    pub fn thread_id(&self) -> (TaskId, ProcessId) {
+        (self.task_id, self.pid)
     }
 }
 
@@ -32,13 +46,13 @@ pub type PageVAddressStart = u16;
 
 #[derive(Default)]
 pub struct TaskMemoryMapping {
-    pub mapping: Vec<(PageId, PageVAddressStart)>,
+    pub mapping: Vec<(Arc<Page>, PageVAddressStart)>,
 }
 
 impl Debug for TaskMemoryMapping {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         struct Mapped {
-            p_id: PageId,
+            p_id: usize,
             pvas: PageVAddressStart,
         }
         impl Debug for Mapped {
@@ -52,11 +66,10 @@ impl Debug for TaskMemoryMapping {
             }
         }
         f.debug_list()
-            .entries(
-                self.mapping
-                    .iter()
-                    .map(|&(p_id, pvas)| Mapped { p_id, pvas }),
-            )
+            .entries(self.mapping.iter().map(|(p_id, pvas)| Mapped {
+                p_id: 0xFF,
+                pvas: *pvas,
+            }))
             .finish()
     }
 }
@@ -227,17 +240,16 @@ pub enum TaskError {
     OverflowError(VmInstructionAddress),
 }
 
-pub struct TaskMemory<'a> {
-    pub ll_bit: &'a mut bool,
-    pub mem: [Option<&'a mut Page>; 0x10000],
+pub struct TaskMemory<'a, 'b> {
+    pub ll_bit: &'a AtomicBool,
+    pub mem: [Option<&'b Page>; 0x10000],
 }
 
-impl<'a> TaskMemory<'a> {
-    pub fn new(tmp_bool: &'a mut bool) -> Self {
-        const NONE_C: Option<&'static mut Page> = None;
+impl<'a, 'b> TaskMemory<'a, 'b> {
+    pub fn new(ll_bit: &'a AtomicBool) -> Self {
         TaskMemory {
-            ll_bit: tmp_bool,
-            mem: [NONE_C; 0x10000],
+            ll_bit,
+            mem: [None; 0x10000],
         }
     }
 }
@@ -245,15 +257,16 @@ impl<'a> TaskMemory<'a> {
 impl Task {
     pub fn run(
         &mut self,
-        sys: &mut SystemCore,
-        mem: &mut TaskMemory<'_>,
+        sys: &mut System,
+        scheduler_task: &mut SchedulerTask,
+        mem: &mut TaskMemory<'_, '_>,
         iterations: u32,
     ) -> Result<TaskRunResult, (TaskError, u32)> {
         let mut ins_cache = {
             (
                 {
-                    match &mut mem.mem[0] {
-                        Some(page) => *page as *const [u8; 0x10000],
+                    match mem.mem[0] {
+                        Some(page) => page,
                         None => {
                             return Err((
                                 TaskError::MemoryDoesNotExistError(
@@ -275,7 +288,7 @@ impl Task {
                     unsafe {
                         let address = $add;
 
-                        let page = match &mut mem.mem[address as usize >> 16] {
+                        let page = match mem.mem[address as usize >> 16] {
                             Some(page) => page,
                             None => {
                                 return Err((
@@ -284,8 +297,7 @@ impl Task {
                                 ))
                             }
                         };
-                        let item = page.get_unchecked_mut(address as u16 as usize);
-                        *core::mem::transmute::<&mut u8, &mut $fn_type>(item) = $val
+                        page.set_from_core_unchecked::<$fn_type>(address as u16, $val);
                     }
                 };
             }
@@ -295,7 +307,7 @@ impl Task {
                     unsafe {
                         let address = $add;
 
-                        let page = match &mut mem.mem[address as usize >> 16] {
+                        let page = match mem.mem[address as usize >> 16] {
                             Some(page) => page,
                             None => {
                                 return Err((
@@ -304,8 +316,7 @@ impl Task {
                                 ))
                             }
                         };
-                        let item = page.get_unchecked_mut(address as u16 as usize);
-                        *core::mem::transmute::<&u8, &$fn_type>(item)
+                        page.load_from_core_unchecked::<$fn_type>(address as u16)
                     }
                 };
             }
@@ -326,8 +337,8 @@ impl Task {
                 if unlikely(self.vm_state.pc >> 16 != ins_cache.1) {
                     ins_cache = (
                         {
-                            match &mem.mem[self.vm_state.pc as usize >> 16] {
-                                Some(page) => *page as *const [u8; 0x10000],
+                            match mem.mem[self.vm_state.pc as usize >> 16] {
+                                Some(page) => page,
                                 None => {
                                     return Err((
                                         TaskError::MemoryDoesNotExistError(
@@ -343,14 +354,13 @@ impl Task {
                     );
                 }
 
-                let item = (*ins_cache.0).get_unchecked(self.vm_state.pc as u16 as usize);
-                *core::mem::transmute::<&u8, &u32>(item)
+                (*ins_cache.0).get_u32_unchecked(self.vm_state.pc as u16)
             };
             self.vm_state.pc = self.vm_state.pc.wrapping_add(4);
 
             macro_rules! interface_call{
                 ($kind:ident, $id:expr) => {
-                    match sys.$kind($id, self, mem){
+                    match sys.$kind($id, self, scheduler_task, mem){
                         crate::system::InterfaceCallResult::Continue => {},
                         crate::system::InterfaceCallResult::ImmediateKill(reason) => {
                             if let Some(reason) = reason {
@@ -496,14 +506,12 @@ impl Task {
                         0b000010 => {
                             //SRL
                             self.vm_state.reg[register_d!(op)] =
-                                (self.vm_state.reg[register_t!(op)] >> register_a!(op)) as u32;
+                                self.vm_state.reg[register_t!(op)] >> register_a!(op);
                         }
                         0b000110 => {
                             //SRLV
-                            self.vm_state.reg[register_d!(op)] = (self.vm_state.reg
-                                [register_t!(op)]
-                                >> (0b11111 & self.vm_state.reg[register_s!(op)]))
-                                as u32;
+                            self.vm_state.reg[register_d!(op)] = self.vm_state.reg[register_t!(op)]
+                                >> (0b11111 & self.vm_state.reg[register_s!(op)]);
                         }
                         0b100010 => {
                             //SUB
@@ -682,13 +690,13 @@ impl Task {
                 }
                 0b001101 => {
                     //ORI
-                    self.vm_state.reg[immediate_t!(op)] = self.vm_state.reg[immediate_s!(op)] as u32
-                        | immediate_immediate_zero_extended!(op) as u32
+                    self.vm_state.reg[immediate_t!(op)] =
+                        self.vm_state.reg[immediate_s!(op)] | immediate_immediate_zero_extended!(op)
                 }
                 0b001110 => {
                     //XORI
-                    self.vm_state.reg[immediate_t!(op)] = self.vm_state.reg[immediate_s!(op)] as u32
-                        ^ immediate_immediate_zero_extended!(op) as u32
+                    self.vm_state.reg[immediate_t!(op)] =
+                        self.vm_state.reg[immediate_s!(op)] ^ immediate_immediate_zero_extended!(op)
                 }
 
                 // constant manupulating inctructions
@@ -714,8 +722,8 @@ impl Task {
                 0b001011 => {
                     //SLTIU
                     self.vm_state.reg[immediate_t!(op)] = {
-                        if (self.vm_state.reg[immediate_s!(op)] as u32)
-                            < (immediate_immediate_signed_extended!(op) as u32)
+                        if self.vm_state.reg[immediate_s!(op)]
+                            < immediate_immediate_signed_extended!(op)
                         {
                             1
                         } else {
@@ -783,9 +791,7 @@ impl Task {
                 }
                 0b000101 => {
                     //BNE
-                    if self.vm_state.reg[immediate_s!(op)]
-                        != self.vm_state.reg[immediate_t!(op) as usize]
-                    {
+                    if self.vm_state.reg[immediate_s!(op)] != self.vm_state.reg[immediate_t!(op)] {
                         self.vm_state.pc = ((self.vm_state.pc as i32)
                             .wrapping_add(immediate_immediate_address!(op)))
                             as u32;
@@ -911,7 +917,7 @@ impl Task {
                         as u32;
 
                     if likely(address & 0b11 == 0) {
-                        *mem.ll_bit = true;
+                        mem.ll_bit.store(true, std::sync::atomic::Ordering::Release);
                         self.vm_state.reg[immediate_t!(op)] = get_mem_alligned!(address, u32);
                     //self.mem.get_u32_alligned(address) as u32
                     } else {
@@ -925,13 +931,14 @@ impl Task {
                         as u32;
 
                     if likely(address & 0b11 == 0) {
-                        if *mem.ll_bit {
+                        if mem.ll_bit.load(std::sync::atomic::Ordering::Acquire) {
                             set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)], u32);
                             self.vm_state.reg[immediate_t!(op)] = 1;
                         } else {
                             self.vm_state.reg[immediate_t!(op)] = 0;
                         }
-                        *mem.ll_bit = false;
+                        mem.ll_bit
+                            .store(false, std::sync::atomic::Ordering::Release);
                     } else {
                         self.vm_state.reg[immediate_t!(op)] = 0;
                         return Err((TaskError::MemoryAllignmentError(4, self.vm_state.pc), ran));
@@ -945,7 +952,8 @@ impl Task {
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
 
-                    *mem.ll_bit = false;
+                    mem.ll_bit
+                        .store(false, std::sync::atomic::Ordering::Release);
                     set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)] as u8, u8);
                 }
                 0b101001 => {
@@ -955,7 +963,8 @@ impl Task {
                         as u32;
 
                     if likely(address & 0b1 == 0) {
-                        *mem.ll_bit = false;
+                        mem.ll_bit
+                            .store(false, std::sync::atomic::Ordering::Release);
                         set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)] as u16, u16);
                     } else {
                         return Err((TaskError::MemoryAllignmentError(2, self.vm_state.pc), ran));
@@ -967,7 +976,8 @@ impl Task {
                         .wrapping_add(immediate_immediate_signed_extended!(op) as i32))
                         as u32;
                     if likely(address & 0b11 == 0) {
-                        *mem.ll_bit = false;
+                        mem.ll_bit
+                            .store(false, std::sync::atomic::Ordering::Release);
                         set_mem_alligned!(address, self.vm_state.reg[immediate_t!(op)], u32);
                     } else {
                         return Err((TaskError::MemoryAllignmentError(4, self.vm_state.pc), ran));

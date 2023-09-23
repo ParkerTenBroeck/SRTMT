@@ -6,3 +6,4 @@ components = [
     "llvm-tools-preview",
 ]
 profile = "minimal"
+channel = "nightly"

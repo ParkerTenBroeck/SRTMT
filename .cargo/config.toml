@@ -3,3 +3,4 @@
 [alias]
 build_all = "run --package build_tools -- -B shell,test_prog"
 run_vm = "run --package build_tools -- run -B shell,test_prog"
+miri_run_vm = "run --package build_tools -- run -M -B shell,test_prog"

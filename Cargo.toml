@@ -23,7 +23,7 @@ description = "A sorta simulation of real time multithreading without actual mul
 tracing = "0.1"
 tracing-subscriber = "0.3"
 core = { path = "vm/core" }
-eframe = "*"
+# eframe = "*"
 
 [profile.release]
 debug = true

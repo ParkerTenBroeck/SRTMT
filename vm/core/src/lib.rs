@@ -1,3 +1,5 @@
+#![feature(pointer_byte_offsets)]
+
 pub mod scheduler;
 pub mod system;
 pub mod task;
